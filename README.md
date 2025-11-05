@@ -5,7 +5,7 @@
 ## 项目结构
 
 ```
-ai-focus/
+real-focus/
 ├── api/
 │   └── focus-assistant.js    # Vercel Serverless Function
 ├── package.json               # 项目依赖

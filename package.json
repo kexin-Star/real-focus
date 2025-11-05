@@ -1,5 +1,5 @@
 {
-  "name": "ai-focus",
+  "name": "real-focus",
   "version": "1.0.0",
   "description": "AI Focus Assistant - Vercel Serverless Function",
   "main": "api/focus-assistant.js",
