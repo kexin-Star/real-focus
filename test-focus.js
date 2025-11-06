@@ -12,7 +12,8 @@ const testData = {
 // Try local first, then Vercel
 const testUrls = [
   'http://localhost:3000/api/focus-assistant',
-  'https://ai-focus-5osqz3ja5-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant'
+  'https://real-focus-a79c571mm-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant',
+  'https://ai-focus-two.vercel.app/api/focus-assistant'
 ];
 
 async function testAPI(url) {

@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     });
 
     // Parse JSON from request body
-    const { keywords, title, url } = req.body;
+    const { keywords, title, url, content_snippet } = req.body;
 
     // Validate required fields
     if (!keywords || !title || !url) {
@@ -52,132 +52,152 @@ export default async function handler(req, res) {
       });
     }
 
-    // Prompt V1.0 Template - Bilingual (Chinese/English)
-    const promptTemplate = `[System/Role Instruction - 角色指令 / System Role]
-You are a professional web focus assistant. Your core responsibility is to strictly judge whether the current webpage's title and URL are directly related to the user's productivity tasks based on the [Task Keywords] provided by the user.
-你是一个专业的网页专注助理。你的核心职责是根据用户提供的【任务关键词】，严格判断当前网页的标题和URL是否与用户的生产力任务直接相关。
+    // Prepare content for embedding (use content_snippet if available, otherwise use title)
+    const webpageContent = content_snippet ? `${title} ${content_snippet}` : title;
 
-[Goal & Constraint - 目标与约束]
-You must output a JSON object. Your judgment result must include a percentage value from 0 to 100 to represent the confidence level of relevance.
-你必须输出一个JSON对象。你的判断结果必须包含一个0到100的百分比数值，以表示相关性的置信度。
+    // Prompt V5.0 Template
+    const promptTemplate = `You are FocusMate, an AI focus assistant that determines whether a webpage helps the user stay productive.
 
-[Input Data - 输入数据]
-The following is the data you need to analyze, separated by XML tags to avoid confusion:
-以下是你需要分析的数据，使用XML标签进行分隔，避免混淆：
+[Objective]
+Evaluate how directly the following webpage supports the user's current task based on the <TASK_KEYWORDS>.
 
-<TASK_KEYWORDS> 
+[Input]
 
-${keywords}
+<TASK_KEYWORDS>${keywords}</TASK_KEYWORDS>
 
-</TASK_KEYWORDS>
+<WEBPAGE_TITLE>${title}</WEBPAGE_TITLE>
 
-<WEBPAGE_TITLE> 
+<WEBPAGE_URL>${url}</WEBPAGE_URL>
 
-${title}
+<WEBPAGE_CONTENT>${content_snippet || ''}</WEBPAGE_CONTENT>
 
-</WEBPAGE_TITLE> 
+[Rules]
+1. Priority: Analyze <WEBPAGE_CONTENT> first, then <WEBPAGE_TITLE>, finally <WEBPAGE_URL>.
 
-<WEBPAGE_URL> 
+2. Scoring (0–100):
+   • 90–100 → Directly relevant core tools, docs, tutorials.
+   • 50–89 → Partially relevant (search results, discussion, related topics).
+   • <50 → Irrelevant, social media, entertainment, ads, news, shopping, or clickbait.
 
-${url}
+3. Penalty: If content includes many unrelated or emotional words (e.g. gossip, celebrities, memes, trending slang), decrease the score.
 
-</WEBPAGE_URL>
+4. Language: Detect the language of <TASK_KEYWORDS> and respond in the same language.
 
+5. Decision:
+   • Score ≥ 50 → status = "Stay"
+   • Score < 50 → status = "Block"
 
+6. Output reason briefly (<25 words).
 
-[Reasoning and Output Logic - 推理与输出逻辑]
+[Output Format]
+Output JSON only:
 
-1. **Reasoning / 推理：** Based on <TASK_KEYWORDS>, infer the user's current work domain (e.g., design, coding, research, etc.).
-   根据<TASK_KEYWORDS>，推理出用户当前正在进行的工作领域（如设计、代码学习、研究等）。
-
-2. **Judgment / 判断：** Strictly judge whether <WEBPAGE_TITLE> and <WEBPAGE_URL> are **direct, high-value** resources or work tools in this domain.
-   严格判断<WEBPAGE_TITLE>和<WEBPAGE_URL>是否为该领域的**直接、高价值**资源或工作工具。
-
-3. **Confidence Score (0-100) / 置信度 (0-100)：** 
-
-	1. **90% and above / 90% 以上：** The webpage is a direct documentation, tutorial, or core work tool for the keywords (e.g., Figma documentation).
-	   网页是关键词的直接文档、教程或核心工作工具（如Figma文档）。
-
-	2. **50%-90%：** The webpage is indirectly related, or is a high-value search results page.
-	   网页间接相关，或是一个高价值的搜索结果页。
-
-	3. **Below 50% / 50% 以下：** The webpage is irrelevant social media, news, entertainment content, or completely unrelated to the keywords.
-	   网页是无关的社交媒体、新闻、娱乐内容，或者与关键词毫不相干。
-
-	4. **Status / 状态：** Your judgment status must follow these rules:
-	   你的判断状态必须符合以下规则：
-
-		- **Score >= 50 / 得分 >= 50：** STATUS must be "Stay" (remain on the page).
-		  STATUS 必须是 "Stay" (留在页面)。
-
-		- **Score < 50 / 得分 < 50：** STATUS must be "Block" (suggest blocking/warning).
-		  STATUS 必须是 "Block" (建议拦截/提示)。
-
-	5. **Reason / 理由：** The reason must be brief and objective, explaining the source of the percentage. 
-	   Respond in the same language as the user's input (Chinese or English).
-	   理由必须简短、客观，解释百分比的来源。
-	   使用与用户输入相同的语言回复（中文或英文）。
-
-
-
-[Output Format - 输出格式]
-You must and only return a JSON object in the following format. Do not include any additional text, prefixes, or explanations.
-你必须且仅返回以下格式的JSON对象。不要包含任何额外文字、前缀或解释。
-
-{ 
-
-	"relevance_score_percent": [Output an integer from 0-100], 
-
-	"status": ["Stay" or "Block"], 
-
-	"reason": "Brief judgment reason (in Chinese or English, matching the user's input language)" 
-
+{
+  "relevance_score_percent": [integer 0–100],
+  "status": ["Stay" or "Block"],
+  "reason": "Short reasoning (in same language)"
 }`;
 
-    // Call OpenAI API with JSON response format enforced
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a professional web focus assistant. You must strictly follow instructions and return JSON format responses. You support both Chinese and English input/output. Respond in the same language as the user\'s input keywords. / 你是一个专业的网页专注助理。你必须严格按照指令返回JSON格式的响应。你支持中英文输入和输出。根据用户输入关键词的语言，使用相同语言回复。'
-        },
-        {
-          role: 'user',
-          content: promptTemplate
-        }
-      ],
-      response_format: { type: 'json_object' },
-      max_tokens: 300,
-      temperature: 0.3
+    // Calculate cosine similarity between embeddings
+    function cosineSimilarity(a, b) {
+      const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
+      const normA = Math.sqrt(a.reduce((sum, val) => sum + val ** 2, 0));
+      const normB = Math.sqrt(b.reduce((sum, val) => sum + val ** 2, 0));
+      return dot / (normA * normB);
+    }
+
+    // Step 1: Calculate Embedding Similarity
+    const [emb1, emb2] = await Promise.all([
+      openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: keywords
+      }),
+      openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: webpageContent
+      })
+    ]);
+
+    const cosine = cosineSimilarity(
+      emb1.data[0].embedding,
+      emb2.data[0].embedding
+    );
+    const semantic_score = Math.round(cosine * 100);
+
+    console.log(`Embedding similarity: ${cosine.toFixed(3)} (semantic score: ${semantic_score})`);
+
+    // Step 2: Determine if we need GPT deep analysis
+    let final_score = semantic_score;
+    let reason = 'High similarity by keywords.';
+    let status = semantic_score >= 50 ? 'Stay' : 'Block';
+    let usedGPT = false;
+
+    // If similarity is in the ambiguous range (0.35-0.75), use GPT for deep analysis
+    if (cosine > 0.35 && cosine < 0.75) {
+      console.log(`Ambiguous similarity (${cosine.toFixed(3)}), using GPT for deep analysis`);
+      usedGPT = true;
+      
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: promptTemplate
+          }
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 120,
+        temperature: 0.2
+      });
+
+      const aiResponseContent = completion.choices[0]?.message?.content || '{}';
+      
+      let gptOutput;
+      try {
+        gptOutput = JSON.parse(aiResponseContent);
+      } catch (parseError) {
+        console.error('Failed to parse GPT response as JSON:', aiResponseContent);
+        // Fallback to semantic score only
+        gptOutput = {
+          relevance_score_percent: semantic_score,
+          status: status,
+          reason: reason
+        };
+      }
+
+      // Validate GPT output
+      if (!gptOutput.relevance_score_percent || !gptOutput.status || !gptOutput.reason) {
+        console.warn('Invalid GPT output structure, using semantic score');
+        gptOutput = {
+          relevance_score_percent: semantic_score,
+          status: status,
+          reason: reason
+        };
+      }
+
+      // Average the semantic score and GPT score
+      final_score = Math.round((semantic_score + gptOutput.relevance_score_percent) / 2);
+      reason = gptOutput.reason;
+      status = final_score >= 50 ? 'Stay' : 'Block';
+    } else {
+      // For high or low similarity, use semantic score directly
+      if (cosine >= 0.75) {
+        reason = 'High semantic similarity with task keywords.';
+        console.log('High similarity, using Embedding only (fast path)');
+      } else {
+        reason = 'Low semantic similarity with task keywords.';
+        console.log('Low similarity, using Embedding only (fast path)');
+      }
+    }
+
+    console.log(`Final score: ${final_score}, Status: ${status}, Used GPT: ${usedGPT}`);
+
+    // Return the final result
+    return res.status(200).json({
+      relevance_score_percent: final_score,
+      status: status,
+      reason: reason
     });
-
-    // Extract and parse the AI response
-    const aiResponseContent = completion.choices[0]?.message?.content || '{}';
-    
-    let aiResult;
-    try {
-      aiResult = JSON.parse(aiResponseContent);
-    } catch (parseError) {
-      console.error('Failed to parse AI response as JSON:', aiResponseContent);
-      return res.status(500).json({
-        error: 'Invalid Response Format',
-        message: 'AI returned invalid JSON format',
-        rawResponse: aiResponseContent
-      });
-    }
-
-    // Validate the response structure
-    if (!aiResult.relevance_score_percent || !aiResult.status || !aiResult.reason) {
-      return res.status(500).json({
-        error: 'Invalid Response Structure',
-        message: 'AI response missing required fields',
-        received: aiResult
-      });
-    }
-
-    // Return the AI analysis result
-    return res.status(200).json(aiResult);
 
   } catch (error) {
     // Handle errors
