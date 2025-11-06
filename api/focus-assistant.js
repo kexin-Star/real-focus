@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       : `Title: ${title.trim()}`;
 
     // ============================================
-    // Prompt V5.1 Template (for GPT deep analysis)
+    // Prompt V3.2 Template (for GPT deep analysis with process reasoning)
     // This function builds the prompt with semantic score included
     // ============================================
 
@@ -123,7 +123,7 @@ export default async function handler(req, res) {
       return `You are FocusMate, an AI focus assistant that determines whether a webpage helps the user stay productive.
 
 [Objective]
-Evaluate how directly the following webpage supports the user's current task based on the <TASK_KEYWORDS>. You will provide a supplementary judgment score to complement the initial semantic similarity score.
+Evaluate how directly the following webpage supports the user's current task based on the <TASK_KEYWORDS>. You will provide a final corrected relevance score that replaces the initial semantic similarity score.
 
 [Input]
 
@@ -138,33 +138,44 @@ Evaluate how directly the following webpage supports the user's current task bas
 <SEMANTIC_SIMILARITY_SCORE>${semanticScore}</SEMANTIC_SIMILARITY_SCORE>
 
 [Context]
-The <SEMANTIC_SIMILARITY_SCORE> (0-100) is calculated using Embedding similarity between the task keywords and webpage content. This score indicates the initial semantic similarity, but may not capture domain-specific relevance, content quality, or task alignment.
+The <SEMANTIC_SIMILARITY_SCORE> (0-100) is calculated using Embedding similarity between the task keywords and webpage content. This score indicates the initial semantic similarity, but may not capture domain-specific relevance, content quality, task alignment, or process-related necessities.
 
-[Your Task]
-Based on your domain knowledge, content analysis, and the provided <SEMANTIC_SIMILARITY_SCORE>, provide a supplementary relevance score (0-100) that considers:
-1. Domain-specific relevance (e.g., is this a core tool, tutorial, or documentation for the task?)
-2. Content quality and depth
-3. Task alignment (does this directly support the user's productivity goal?)
-4. Potential distractions (social media, entertainment, clickbait, etc.)
+[Reasoning and Output Logic]
 
-[Rules]
-1. Priority: Analyze <WEBPAGE_CONTENT> first, then <WEBPAGE_TITLE>, finally <WEBPAGE_URL>.
+1. **Content Analysis:**
+   - Priority: Analyze <WEBPAGE_CONTENT> first, then <WEBPAGE_TITLE>, finally <WEBPAGE_URL>.
+   - Evaluate domain-specific relevance (e.g., is this a core tool, tutorial, or documentation for the task?).
+   - Assess content quality and depth.
+   - Check task alignment (does this directly support the user's productivity goal?).
 
-2. Scoring Guidelines (0–100):
-   • 90–100 → Directly relevant core tools, docs, tutorials, essential resources.
-   • 50–89 → Partially relevant (search results, discussion, related topics, helpful but not essential).
+2. **Process Common Sense Reasoning (Critical):**
+   - **Judge whether the current page content belongs to essential supporting tools, API management, official documentation, or other administrative/management processes required to complete the user's task.**
+   - **If the page is a necessary supporting resource (e.g., API usage pages, documentation portals, account management, billing pages for tools being used), even if the semantic score is relatively low, you should provide a higher corrected score.**
+   - Examples of process-necessary pages:
+     * API usage/billing pages for tools mentioned in task keywords
+     * Official documentation for frameworks/libraries being used
+     * Account management or authentication pages for required services
+     * Development environment setup or configuration pages
+     * Version control or project management tools related to the task
+
+3. **Correction Instruction:**
+   - **Ignore the interference of the initial semantic score on your final judgment.**
+   - **Based on your domain knowledge and process reasoning, directly provide the final corrected score (0-100) that reflects the true relevance to the user's task.**
+   - The corrected score should replace the semantic score, not complement it.
+
+4. **Scoring Guidelines (0–100):**
+   • 90–100 → Directly relevant core tools, docs, tutorials, essential resources, or necessary process pages.
+   • 50–89 → Partially relevant (search results, discussion, related topics, helpful but not essential), or supporting process pages.
    • <50 → Irrelevant, social media, entertainment, ads, news, shopping, or clickbait.
 
-3. Penalty: If content includes many unrelated or emotional words (e.g. gossip, celebrities, memes, trending slang), decrease the score.
+5. **Penalty:** If content includes many unrelated or emotional words (e.g. gossip, celebrities, memes, trending slang), decrease the score.
 
-4. Language: Detect the language of <TASK_KEYWORDS> and respond in the same language.
-
-5. Output Format: You must output a JSON object with:
-   - "relevance_score_percent": Your supplementary judgment score (0-100, integer)
-   - "reason": Brief explanation of your judgment (<25 words, in the same language as TASK_KEYWORDS)
+6. **Language:** Detect the language of <TASK_KEYWORDS> and respond in the same language.
 
 [Output Format]
-Output JSON only:
+Output JSON only. You must provide:
+- "relevance_score_percent": Your final corrected score (0-100, integer) that replaces the semantic score
+- "reason": Brief explanation of your judgment (<25 words, in the same language as TASK_KEYWORDS)
 
 {
   "relevance_score_percent": [integer 0–100],
@@ -278,17 +289,17 @@ Output JSON only:
           };
         }
 
-        // Ensure GPT score is in valid range (0-100)
-        const gptScore = Math.max(0, Math.min(100, Math.round(gptOutput.relevance_score_percent)));
+        // Ensure GPT corrected score is in valid range (0-100)
+        const gptCorrectedScore = Math.max(0, Math.min(100, Math.round(gptOutput.relevance_score_percent)));
 
-        // Calculate final score: average of semantic score and GPT score
-        final_score = Math.round((semantic_score + gptScore) / 2);
+        // Use GPT's corrected score to replace the semantic score (not average)
+        final_score = gptCorrectedScore;
         reason = gptOutput.reason;
         
-        // Determine status based on final score
+        // Determine status based on final corrected score
         status = final_score >= 50 ? 'Stay' : 'Block';
         
-        console.log(`GPT analysis: Semantic=${semantic_score}, GPT=${gptScore}, Final=${final_score}, Status=${status}`);
+        console.log(`GPT analysis: Semantic=${semantic_score}, GPT Corrected=${gptCorrectedScore}, Final=${final_score}, Status=${status}`);
       } catch (gptError) {
         console.error('Error calling GPT API:', gptError);
         // Fallback: use semantic score directly
