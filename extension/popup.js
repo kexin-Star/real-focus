@@ -144,7 +144,12 @@ async function handlePause() {
   });
   
   showPausedState();
-  await checkSiteRelevance();
+  // Note: Do not call checkSiteRelevance() here
+  // Pausing the timer should not trigger a new relevance check
+  // The relevance analysis should only update when:
+  // 1. Starting a new focus session
+  // 2. Switching to a different tab (handled by chrome.tabs listeners)
+  // 3. Page navigation (handled by chrome.tabs listeners)
 }
 
 // Handle resume
