@@ -198,12 +198,66 @@ Output JSON only. You must provide:
     ]);
 
     // Calculate semantic score (0-100)
-    const semantic_score = cosineSimilarity(keywordsEmbedding, webpageEmbedding);
+    let semantic_score = cosineSimilarity(keywordsEmbedding, webpageEmbedding);
     
     // Calculate raw cosine value for logging (0-1 range)
     const rawCosine = semantic_score / 100;
     
     console.log(`Embedding similarity: ${rawCosine.toFixed(3)} (semantic score: ${semantic_score})`);
+
+    // ============================================
+    // Meta-Task Process Common Sense Pre-Check
+    // ============================================
+
+    /**
+     * Meta-Task keywords list for process management pages
+     * These keywords indicate pages that are necessary for task completion
+     * even if semantic similarity is low
+     */
+    const metaTaskKeywords = {
+      chinese: ['用量', '账单', '配置', '密钥', '文档', '控制台'],
+      english: ['usage', 'billing', 'api key', 'console', 'dashboard', 'github', 'gitlab', 'vercel', 'login', 'auth', 'settings', 'account', 'profile', 'documentation', 'docs']
+    };
+
+    /**
+     * Check if a page is a Meta-Task process management page
+     * @param {string} url - Page URL
+     * @param {string} title - Page title
+     * @returns {boolean} - True if page contains meta-task keywords
+     */
+    function isMetaTaskPage(url, title) {
+      const combinedText = `${url} ${title}`.toLowerCase();
+      
+      // Check Chinese keywords
+      for (const keyword of metaTaskKeywords.chinese) {
+        if (combinedText.includes(keyword.toLowerCase())) {
+          return true;
+        }
+      }
+      
+      // Check English keywords
+      for (const keyword of metaTaskKeywords.english) {
+        if (combinedText.includes(keyword.toLowerCase())) {
+          return true;
+        }
+      }
+      
+      return false;
+    }
+
+    // Perform Meta-Task pre-check
+    const isMetaTask = isMetaTaskPage(url, title);
+    
+    if (isMetaTask && semantic_score < 75) {
+      console.log(`Meta-Task page detected (URL: ${url}, Title: ${title})`);
+      console.log(`Original semantic score: ${semantic_score}, forcing to 50 to trigger GPT analysis`);
+      
+      // Force semantic score to 50 to ensure GPT deep analysis
+      // 50 is between 35 and 75, guaranteeing GPT path execution
+      semantic_score = 50;
+      
+      console.log(`Semantic score updated to: ${semantic_score} (will trigger GPT deep analysis)`);
+    }
 
     // ============================================
     // Step 2: Hybrid Judgment Strategy (Three-Tier Logic)
