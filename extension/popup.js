@@ -33,8 +33,14 @@ let currentState = 'input'; // 'input', 'focused', 'paused'
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSavedState();
-  updateCurrentSite();
+  await updateCurrentSite();
   setupEventListeners();
+  
+  // If not in input state, check current site relevance
+  // This ensures data is fresh when popup reopens
+  if (currentState !== 'input') {
+    await checkSiteRelevance();
+  }
 });
 
 // Load saved state from storage
@@ -60,6 +66,40 @@ async function loadSavedState() {
     }
   } catch (error) {
     console.error('Error loading saved state:', error);
+  }
+}
+
+// Sync relevance data between focused and paused states
+// This ensures both states always show the same data
+function syncRelevanceData() {
+  // Determine which state is currently visible and use it as source
+  const isFocusedVisible = !focusedState.classList.contains('hidden');
+  const isPausedVisible = !pausedState.classList.contains('hidden');
+  
+  if (isFocusedVisible) {
+    // Copy from focused state to paused state
+    const score = relevanceScoreDisplay.textContent;
+    const status = statusDisplay.textContent;
+    const site = currentSiteDisplay.textContent;
+    
+    if (score) relevanceScoreDisplayPaused.textContent = score;
+    if (status) statusDisplayPaused.textContent = status;
+    if (site) currentSiteDisplayPaused.textContent = site;
+    
+    relevanceScoreDisplayPaused.className = relevanceScoreDisplay.className;
+    statusDisplayPaused.className = statusDisplay.className;
+  } else if (isPausedVisible) {
+    // Copy from paused state to focused state
+    const score = relevanceScoreDisplayPaused.textContent;
+    const status = statusDisplayPaused.textContent;
+    const site = currentSiteDisplayPaused.textContent;
+    
+    if (score) relevanceScoreDisplay.textContent = score;
+    if (status) statusDisplay.textContent = status;
+    if (site) currentSiteDisplay.textContent = site;
+    
+    relevanceScoreDisplay.className = relevanceScoreDisplayPaused.className;
+    statusDisplay.className = statusDisplayPaused.className;
   }
 }
 
@@ -180,6 +220,10 @@ function showFocusedState() {
   focusedState.classList.remove('hidden');
   pausedState.classList.add('hidden');
   currentState = 'focused';
+  
+  // Sync data from paused state to focused state if paused state has newer data
+  // This ensures data consistency when switching states
+  syncRelevanceData();
 }
 
 // Show paused state
@@ -188,6 +232,10 @@ function showPausedState() {
   focusedState.classList.add('hidden');
   pausedState.classList.remove('hidden');
   currentState = 'paused';
+  
+  // Sync data from focused state to paused state
+  // This ensures data consistency when switching states
+  syncRelevanceData();
 }
 
 // Timer functions
@@ -275,7 +323,7 @@ async function checkSiteRelevance() {
           console.log('Fresh API result for:', tab.url);
         }
         
-        // Update relevance score
+        // Update relevance score (update both states to keep them in sync)
         const score = data.relevance_score_percent || 0;
         relevanceScoreDisplay.textContent = `${score}%`;
         relevanceScoreDisplayPaused.textContent = `${score}%`;
@@ -283,7 +331,7 @@ async function checkSiteRelevance() {
         // Update score color based on value
         updateScoreColor(score);
         
-        // Update status
+        // Update status (update both states to keep them in sync)
         const status = data.status || 'Stay';
         statusDisplay.textContent = status;
         statusDisplayPaused.textContent = status;
@@ -296,6 +344,9 @@ async function checkSiteRelevance() {
           statusDisplay.className = 'status-display status-block';
           statusDisplayPaused.className = 'status-display status-block';
         }
+        
+        // Ensure both states are in sync
+        syncRelevanceData();
       } else if (response && response.error) {
         console.error('Error from Service Worker:', response.error);
       }
@@ -326,17 +377,22 @@ function editSubject() {
 }
 
 // Listen for tab changes to update current site
-chrome.tabs.onActivated.addListener(() => {
-  updateCurrentSite();
+// Note: These listeners only work when popup is open
+// When popup reopens, DOMContentLoaded will check current site
+chrome.tabs.onActivated.addListener(async () => {
+  await updateCurrentSite();
   if (currentState !== 'input') {
-    checkSiteRelevance();
+    await checkSiteRelevance();
   }
 });
 
-chrome.tabs.onUpdated.addListener(() => {
-  updateCurrentSite();
-  if (currentState !== 'input') {
-    checkSiteRelevance();
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  // Only trigger on completed navigation
+  if (changeInfo.status === 'complete') {
+    await updateCurrentSite();
+    if (currentState !== 'input') {
+      await checkSiteRelevance();
+    }
   }
 });
 

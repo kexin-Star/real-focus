@@ -322,3 +322,22 @@ setInterval(() => {
   clearOldCache();
 }, 60 * 60 * 1000);
 
+// Listen for tab changes to notify popup (if open)
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  // Notify popup if it's open (optional - popup will check on open anyway)
+  // This is mainly for logging/debugging
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    console.log('Tab activated:', tab.url);
+  } catch (error) {
+    // Tab might not be accessible
+  }
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // Only trigger on completed navigation
+  if (changeInfo.status === 'complete' && tab.url) {
+    console.log('Tab updated:', tab.url);
+  }
+});
+

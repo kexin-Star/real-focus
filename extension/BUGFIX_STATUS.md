@@ -156,3 +156,36 @@ async function handlePause() {
 
 ✅ **已修复** - 等待测试验证
 
+---
+
+# Bug 修复 2：标签页切换后 UI 不更新问题
+
+## 问题描述
+
+**现象**：
+1. 暂停一次后，切换 tab，显示判定结果的 UI 界面不发生变化
+2. 重新启动计时器切换 tab 后，判定界面始终显示为相关 "Stay"
+3. 但是暂停后则显示"真实"的判定数据
+
+## 根本原因
+
+1. **Popup 关闭时监听器失效**：popup.js 中的标签页切换监听器在 popup 关闭时不会工作
+2. **Popup 重新打开时未刷新数据**：只加载保存的状态，不检查当前标签页
+3. **状态切换时数据不同步**：focused state 和 paused state 的显示元素可能不同步
+
+## 修复方案
+
+1. ✅ Popup 打开时检查当前标签页（`DOMContentLoaded` 时调用 `checkSiteRelevance()`）
+2. ✅ 添加数据同步函数 `syncRelevanceData()`
+3. ✅ 状态切换时同步数据（`showFocusedState()` 和 `showPausedState()`）
+4. ✅ 更新相关性时同步数据（`checkSiteRelevance()` 回调中）
+
+## 相关文件
+
+- `extension/popup.js` - 已修复
+- `extension/TAB_SWITCH_BUG_FIX.md` - 详细问题分析和修复说明
+
+## 状态
+
+✅ **已修复** - 等待测试验证
+
