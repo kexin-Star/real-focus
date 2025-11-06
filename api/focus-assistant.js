@@ -52,14 +52,78 @@ export default async function handler(req, res) {
       });
     }
 
-    // Prepare content for embedding (use content_snippet if available, otherwise use title)
-    const webpageContent = content_snippet ? `${title} ${content_snippet}` : title;
+    // ============================================
+    // Helper Functions: Embedding & Similarity
+    // ============================================
 
-    // Prompt V5.0 Template
-    const promptTemplate = `You are FocusMate, an AI focus assistant that determines whether a webpage helps the user stay productive.
+    /**
+     * Generate embedding vector for a given text using OpenAI's embedding model
+     * @param {string} text - Input text to generate embedding for
+     * @returns {Promise<number[]>} - Embedding vector
+     */
+    async function getEmbedding(text) {
+      const response = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: text
+      });
+      return response.data[0].embedding;
+    }
+
+    /**
+     * Calculate cosine similarity between two embedding vectors
+     * Returns a normalized score from 0-100 (integer)
+     * @param {number[]} vecA - First embedding vector
+     * @param {number[]} vecB - Second embedding vector
+     * @returns {number} - Cosine similarity score (0-100, integer)
+     */
+    function cosineSimilarity(vecA, vecB) {
+      // Calculate dot product
+      const dot = vecA.reduce((sum, val, i) => sum + val * vecB[i], 0);
+      
+      // Calculate norms
+      const normA = Math.sqrt(vecA.reduce((sum, val) => sum + val ** 2, 0));
+      const normB = Math.sqrt(vecB.reduce((sum, val) => sum + val ** 2, 0));
+      
+      // Calculate cosine similarity (range: -1 to 1)
+      const cosine = dot / (normA * normB);
+      
+      // Normalize to 0-1 range (assuming cosine is already in -1 to 1)
+      // For embeddings, cosine similarity is typically in 0-1 range
+      const normalized = Math.max(0, Math.min(1, cosine));
+      
+      // Convert to 0-100 integer score
+      return Math.round(normalized * 100);
+    }
+
+    // ============================================
+    // Embedding Input Optimization
+    // ============================================
+
+    /**
+     * Build optimized text for keywords embedding
+     * Uses keywords directly as they represent the user's task intent
+     */
+    const keywordsText = keywords.trim();
+
+    /**
+     * Build optimized text for webpage content embedding
+     * Combines title and content_snippet into a contextual sentence
+     * This improves semantic quality by providing more context
+     */
+    const webpageContentText = content_snippet 
+      ? `Title: ${title.trim()}. Content: ${content_snippet.trim()}`
+      : `Title: ${title.trim()}`;
+
+    // ============================================
+    // Prompt V5.1 Template (for GPT deep analysis)
+    // This function builds the prompt with semantic score included
+    // ============================================
+
+    function buildPromptTemplate(semanticScore) {
+      return `You are FocusMate, an AI focus assistant that determines whether a webpage helps the user stay productive.
 
 [Objective]
-Evaluate how directly the following webpage supports the user's current task based on the <TASK_KEYWORDS>.
+Evaluate how directly the following webpage supports the user's current task based on the <TASK_KEYWORDS>. You will provide a supplementary judgment score to complement the initial semantic similarity score.
 
 [Input]
 
@@ -71,126 +135,171 @@ Evaluate how directly the following webpage supports the user's current task bas
 
 <WEBPAGE_CONTENT>${content_snippet || ''}</WEBPAGE_CONTENT>
 
+<SEMANTIC_SIMILARITY_SCORE>${semanticScore}</SEMANTIC_SIMILARITY_SCORE>
+
+[Context]
+The <SEMANTIC_SIMILARITY_SCORE> (0-100) is calculated using Embedding similarity between the task keywords and webpage content. This score indicates the initial semantic similarity, but may not capture domain-specific relevance, content quality, or task alignment.
+
+[Your Task]
+Based on your domain knowledge, content analysis, and the provided <SEMANTIC_SIMILARITY_SCORE>, provide a supplementary relevance score (0-100) that considers:
+1. Domain-specific relevance (e.g., is this a core tool, tutorial, or documentation for the task?)
+2. Content quality and depth
+3. Task alignment (does this directly support the user's productivity goal?)
+4. Potential distractions (social media, entertainment, clickbait, etc.)
+
 [Rules]
 1. Priority: Analyze <WEBPAGE_CONTENT> first, then <WEBPAGE_TITLE>, finally <WEBPAGE_URL>.
 
-2. Scoring (0–100):
-   • 90–100 → Directly relevant core tools, docs, tutorials.
-   • 50–89 → Partially relevant (search results, discussion, related topics).
+2. Scoring Guidelines (0–100):
+   • 90–100 → Directly relevant core tools, docs, tutorials, essential resources.
+   • 50–89 → Partially relevant (search results, discussion, related topics, helpful but not essential).
    • <50 → Irrelevant, social media, entertainment, ads, news, shopping, or clickbait.
 
 3. Penalty: If content includes many unrelated or emotional words (e.g. gossip, celebrities, memes, trending slang), decrease the score.
 
 4. Language: Detect the language of <TASK_KEYWORDS> and respond in the same language.
 
-5. Decision:
-   • Score ≥ 50 → status = "Stay"
-   • Score < 50 → status = "Block"
-
-6. Output reason briefly (<25 words).
+5. Output Format: You must output a JSON object with:
+   - "relevance_score_percent": Your supplementary judgment score (0-100, integer)
+   - "reason": Brief explanation of your judgment (<25 words, in the same language as TASK_KEYWORDS)
 
 [Output Format]
 Output JSON only:
 
 {
   "relevance_score_percent": [integer 0–100],
-  "status": ["Stay" or "Block"],
   "reason": "Short reasoning (in same language)"
 }`;
-
-    // Calculate cosine similarity between embeddings
-    function cosineSimilarity(a, b) {
-      const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
-      const normA = Math.sqrt(a.reduce((sum, val) => sum + val ** 2, 0));
-      const normB = Math.sqrt(b.reduce((sum, val) => sum + val ** 2, 0));
-      return dot / (normA * normB);
     }
 
+    // ============================================
     // Step 1: Calculate Embedding Similarity
-    const [emb1, emb2] = await Promise.all([
-      openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: keywords
-      }),
-      openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: webpageContent
-      })
+    // ============================================
+
+    console.log('Generating embeddings...');
+    console.log('Keywords text:', keywordsText);
+    console.log('Webpage content text:', webpageContentText);
+
+    // Generate embeddings in parallel for better performance
+    const [keywordsEmbedding, webpageEmbedding] = await Promise.all([
+      getEmbedding(keywordsText),
+      getEmbedding(webpageContentText)
     ]);
 
-    const cosine = cosineSimilarity(
-      emb1.data[0].embedding,
-      emb2.data[0].embedding
-    );
-    const semantic_score = Math.round(cosine * 100);
+    // Calculate semantic score (0-100)
+    const semantic_score = cosineSimilarity(keywordsEmbedding, webpageEmbedding);
+    
+    // Calculate raw cosine value for logging (0-1 range)
+    const rawCosine = semantic_score / 100;
+    
+    console.log(`Embedding similarity: ${rawCosine.toFixed(3)} (semantic score: ${semantic_score})`);
 
-    console.log(`Embedding similarity: ${cosine.toFixed(3)} (semantic score: ${semantic_score})`);
+    // ============================================
+    // Step 2: Hybrid Judgment Strategy (Three-Tier Logic)
+    // ============================================
 
-    // Step 2: Determine if we need GPT deep analysis
-    let final_score = semantic_score;
-    let reason = 'High similarity by keywords.';
-    let status = semantic_score >= 50 ? 'Stay' : 'Block';
+    let final_score;
+    let reason;
+    let status;
     let usedGPT = false;
 
-    // If similarity is in the ambiguous range (0.35-0.75), use GPT for deep analysis
-    if (cosine > 0.35 && cosine < 0.75) {
-      console.log(`Ambiguous similarity (${cosine.toFixed(3)}), using GPT for deep analysis`);
+    // ============================================
+    // Tier 1: High Relevance (Fast Pass) - Skip GPT
+    // ============================================
+    if (semantic_score >= 75) {
+      console.log(`High relevance detected (score: ${semantic_score}), using fast pass (no GPT)`);
+      
+      // Use a high score in the range 85-95 (simplified to 90)
+      final_score = 90;
+      status = 'Stay';
+      reason = 'Content shows high semantic similarity with task keywords. Directly relevant resource.';
+      
+      console.log(`Fast pass: Final score = ${final_score}, Status = ${status}`);
+    }
+    // ============================================
+    // Tier 2: Low Relevance (Fast Block) - Skip GPT
+    // ============================================
+    else if (semantic_score <= 35) {
+      console.log(`Low relevance detected (score: ${semantic_score}), using fast block (no GPT)`);
+      
+      // Use a low score in the range 10-20 (simplified to 15)
+      final_score = 15;
+      status = 'Block';
+      reason = 'Content shows low semantic similarity with task keywords. Not relevant to current task.';
+      
+      console.log(`Fast block: Final score = ${final_score}, Status = ${status}`);
+    }
+    // ============================================
+    // Tier 3: Ambiguous Relevance (Deep Analysis) - Use GPT
+    // ============================================
+    else {
+      // Semantic score is between 35 and 75 (inclusive boundaries)
+      console.log(`Ambiguous relevance (score: ${semantic_score}), using GPT deep analysis`);
       usedGPT = true;
       
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: promptTemplate
-          }
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: 120,
-        temperature: 0.2
-      });
-
-      const aiResponseContent = completion.choices[0]?.message?.content || '{}';
+      // Build prompt with semantic score included
+      const promptTemplate = buildPromptTemplate(semantic_score);
       
-      let gptOutput;
       try {
-        gptOutput = JSON.parse(aiResponseContent);
-      } catch (parseError) {
-        console.error('Failed to parse GPT response as JSON:', aiResponseContent);
-        // Fallback to semantic score only
-        gptOutput = {
-          relevance_score_percent: semantic_score,
-          status: status,
-          reason: reason
-        };
-      }
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: promptTemplate
+            }
+          ],
+          response_format: { type: 'json_object' },
+          max_tokens: 150,
+          temperature: 0.2
+        });
 
-      // Validate GPT output
-      if (!gptOutput.relevance_score_percent || !gptOutput.status || !gptOutput.reason) {
-        console.warn('Invalid GPT output structure, using semantic score');
-        gptOutput = {
-          relevance_score_percent: semantic_score,
-          status: status,
-          reason: reason
-        };
-      }
+        const aiResponseContent = completion.choices[0]?.message?.content || '{}';
+        
+        let gptOutput;
+        try {
+          gptOutput = JSON.parse(aiResponseContent);
+        } catch (parseError) {
+          console.error('Failed to parse GPT response as JSON:', aiResponseContent);
+          // Fallback: use semantic score as GPT score
+          gptOutput = {
+            relevance_score_percent: semantic_score,
+            reason: 'Unable to parse GPT response, using semantic score.'
+          };
+        }
 
-      // Average the semantic score and GPT score
-      final_score = Math.round((semantic_score + gptOutput.relevance_score_percent) / 2);
-      reason = gptOutput.reason;
-      status = final_score >= 50 ? 'Stay' : 'Block';
-    } else {
-      // For high or low similarity, use semantic score directly
-      if (cosine >= 0.75) {
-        reason = 'High semantic similarity with task keywords.';
-        console.log('High similarity, using Embedding only (fast path)');
-      } else {
-        reason = 'Low semantic similarity with task keywords.';
-        console.log('Low similarity, using Embedding only (fast path)');
+        // Validate GPT output
+        if (typeof gptOutput.relevance_score_percent !== 'number' || 
+            !gptOutput.reason) {
+          console.warn('Invalid GPT output structure, using semantic score');
+          gptOutput = {
+            relevance_score_percent: semantic_score,
+            reason: 'Invalid GPT response, using semantic score.'
+          };
+        }
+
+        // Ensure GPT score is in valid range (0-100)
+        const gptScore = Math.max(0, Math.min(100, Math.round(gptOutput.relevance_score_percent)));
+
+        // Calculate final score: average of semantic score and GPT score
+        final_score = Math.round((semantic_score + gptScore) / 2);
+        reason = gptOutput.reason;
+        
+        // Determine status based on final score
+        status = final_score >= 50 ? 'Stay' : 'Block';
+        
+        console.log(`GPT analysis: Semantic=${semantic_score}, GPT=${gptScore}, Final=${final_score}, Status=${status}`);
+      } catch (gptError) {
+        console.error('Error calling GPT API:', gptError);
+        // Fallback: use semantic score directly
+        final_score = semantic_score;
+        status = semantic_score >= 50 ? 'Stay' : 'Block';
+        reason = 'GPT analysis unavailable, using semantic similarity score.';
+        usedGPT = false; // Mark as not used due to error
       }
     }
 
-    console.log(`Final score: ${final_score}, Status: ${status}, Used GPT: ${usedGPT}`);
+    console.log(`Final judgment: Score=${final_score}, Status=${status}, Used GPT=${usedGPT}`);
 
     // Return the final result
     return res.status(200).json({
