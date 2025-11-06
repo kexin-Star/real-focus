@@ -52,44 +52,111 @@ export default async function handler(req, res) {
       });
     }
 
-    // Create a prompt for the AI assistant
-    const prompt = `You are a focus assistant. A user is viewing a webpage with the following information:
-- Title: ${title}
-- URL: ${url}
-- Keywords: ${keywords}
+    // Prompt V1.0 Template
+    const promptTemplate = `[System/Role Instruction - 角色指令] 你是一个专业的网页专注助理。你的核心职责是根据用户提供的【任务关键词】，严格判断当前网页的标题和URL是否与用户的生产力任务直接相关。 
 
-Please provide a brief, focused summary or analysis to help the user stay focused on what's important. Keep the response concise and actionable.`;
+[Goal & Constraint - 目标与约束] 你必须输出一个JSON对象。你的判断结果必须包含一个0到100的百分比数值，以表示相关性的置信度。 
 
-    // Call OpenAI API
+[Input Data - 输入数据] 以下是你需要分析的数据，使用XML标签进行分隔，避免混淆： <TASK_KEYWORDS> 
+
+${keywords}
+
+</TASK_KEYWORDS>
+
+<WEBPAGE_TITLE> 
+
+${title}
+
+</WEBPAGE_TITLE> 
+
+<WEBPAGE_URL> 
+
+${url}
+
+</WEBPAGE_URL>
+
+
+
+[Reasoning and Output Logic - 推理与输出逻辑]
+
+1. **推理：** 根据<TASK_KEYWORDS>，推理出用户当前正在进行的工作领域（如设计、代码学习、研究等）。 
+
+2. **判断：** 严格判断<WEBPAGE_TITLE>和<WEBPAGE_URL>是否为该领域的**直接、高价值**资源或工作工具。 
+
+3. **置信度 (0-100)：** 
+
+	1. **90% 以上：** 网页是关键词的直接文档、教程或核心工作工具（如Figma文档）。 
+
+	2. **50%-90%：** 网页间接相关，或是一个高价值的搜索结果页。 
+
+	3. **50% 以下：** 网页是无关的社交媒体、新闻、娱乐内容，或者与关键词毫不相干。 
+
+	4. **状态 (Status)：** 你的判断状态必须符合以下规则： 
+
+		- **得分 >= 50：** STATUS 必须是 "Stay" (留在页面)。 
+
+		- **得分 < 50：** STATUS 必须是 "Block" (建议拦截/提示)。 
+
+	5. **理由 (Reason)：** 理由必须简短、客观，解释百分比的来源。
+
+
+
+[Output Format - 输出格式] 你必须且仅返回以下格式的JSON对象。不要包含任何额外文字、前缀或解释。 
+
+{ 
+
+	"relevance_score_percent": [输出0-100的整数], 
+
+	"status": ["Stay" 或 "Block"], 
+
+	"reason": "简短的判断理由" 
+
+}`;
+
+    // Call OpenAI API with JSON response format enforced
     const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful focus assistant that helps users stay focused and extract key information from web content.'
+          content: '你是一个专业的网页专注助理。你必须严格按照指令返回JSON格式的响应。'
         },
         {
           role: 'user',
-          content: prompt
+          content: promptTemplate
         }
       ],
-      max_tokens: 200,
-      temperature: 0.7
+      response_format: { type: 'json_object' },
+      max_tokens: 300,
+      temperature: 0.3
     });
 
-    // Extract the AI response
-    const aiResponse = completion.choices[0]?.message?.content || 'No response generated';
+    // Extract and parse the AI response
+    const aiResponseContent = completion.choices[0]?.message?.content || '{}';
+    
+    let aiResult;
+    try {
+      aiResult = JSON.parse(aiResponseContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', aiResponseContent);
+      return res.status(500).json({
+        error: 'Invalid Response Format',
+        message: 'AI returned invalid JSON format',
+        rawResponse: aiResponseContent
+      });
+    }
 
-    // Return success response with AI analysis
-    return res.status(200).json({
-      status: 'success',
-      data: {
-        keywords,
-        title,
-        url,
-        focusAnalysis: aiResponse
-      }
-    });
+    // Validate the response structure
+    if (!aiResult.relevance_score_percent || !aiResult.status || !aiResult.reason) {
+      return res.status(500).json({
+        error: 'Invalid Response Structure',
+        message: 'AI response missing required fields',
+        received: aiResult
+      });
+    }
+
+    // Return the AI analysis result
+    return res.status(200).json(aiResult);
 
   } catch (error) {
     // Handle errors
