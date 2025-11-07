@@ -362,6 +362,15 @@ Output JSON only. You must provide:
     };
 
     /**
+     * Toolchain keywords for development tools and documentation
+     * These keywords indicate pages that are essential for development tasks
+     */
+    const toolchainKeywords = {
+      tools: ['vercel', 'github', 'gitlab', 'gemini', 'google', 'openai', 'claude', 'cursor', 'npm', 'node', 'react', 'vue', 'angular', 'nextjs', 'nuxt'],
+      documentation: ['docs', 'documentation', 'api', 'reference', 'guide', 'tutorial', 'getting-started', 'quickstart', 'examples', 'cli', 'command', 'error', 'errors', 'troubleshooting', 'faq', 'help', 'support']
+    };
+
+    /**
      * Extract domain from URL
      * @param {string} url - Page URL
      * @returns {string|null} - Domain name or null if invalid
@@ -548,6 +557,29 @@ Output JSON only. You must provide:
     
     if (extractedDomain) {
       console.log(`🔍 Domain check: ${extractedDomain}, isToolChainDomain: ${isToolChainDomain}`);
+    }
+
+    // ============================================
+    // Toolchain Keyword Detection (Before Fast Block)
+    // ============================================
+    // Check if URL/Title/Content contains toolchain keywords
+    // This ensures toolchain pages are not Fast Blocked even with low semantic scores
+    const combinedTextForToolchain = `${url} ${title} ${content_snippet || ''}`.toLowerCase();
+    const hasToolchainKeyword = toolchainKeywords.tools.some(k => combinedTextForToolchain.includes(k.toLowerCase())) ||
+                                toolchainKeywords.documentation.some(k => combinedTextForToolchain.includes(k.toLowerCase()));
+    
+    // If toolchain keyword detected AND semantic score is low (<= 35), force score upgrade
+    // This ensures toolchain documentation pages go through GPT analysis instead of Fast Block
+    if (hasToolchainKeyword && semantic_score <= 35 && !isInterferenceDomain) {
+      console.log(`🔧 Toolchain keyword detected in URL/Title/Content`);
+      console.log(`   Original semantic score: ${semantic_score}, forcing to 40 to skip Fast Block`);
+      console.log(`   This ensures toolchain pages (e.g., Vercel /docs) go through GPT analysis`);
+      
+      // Force semantic score to 40 to skip Fast Block (which is <= 20)
+      // 40 is between 20 and 75, guaranteeing GPT path execution
+      semantic_score = 40;
+      
+      console.log(`   Semantic score updated to: ${semantic_score} (will trigger GPT deep analysis)`);
     }
 
     // ============================================

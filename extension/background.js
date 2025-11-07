@@ -218,7 +218,7 @@ async function extractContentFromTab(tabId) {
  * @returns {Promise<Object>} - AI result
  */
 async function callAIAPI(keywords, title, url, extractedContent = null) {
-  // Use the latest deployed API URL (same as test scripts)
+  // Use the latest deployed API URL
   const apiUrl = 'https://real-focus-32cpqcsg8-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant';
   
   // Use extracted content if available, otherwise fallback to title
@@ -281,9 +281,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (tabId) {
           extractedContent = await extractContentFromTab(tabId);
           if (extractedContent) {
+            const snippet = extractedContent.content_snippet || '';
             console.log('Content extracted:', {
               title: extractedContent.title,
-              snippet_length: extractedContent.content_snippet?.length || 0
+              snippet_length: snippet.length,
+              snippetPreview: snippet.substring(0, 200) + (snippet.length > 200 ? '...' : '')
             });
           }
         }
@@ -303,7 +305,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           title: contentTitle,
           url,
           hasContentSnippet: !!contentSnippet,
-          contentSnippetLength: contentSnippet?.length || 0
+          contentSnippetLength: contentSnippet?.length || 0,
+          contentSnippetPreview: contentSnippet ? (contentSnippet.substring(0, 200) + (contentSnippet.length > 200 ? '...' : '')) : 'N/A'
         });
         
         const aiResult = await callAIAPI(keywords, contentTitle, url, extractedContent);
@@ -312,7 +315,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           relevance_score_percent: aiResult.relevance_score_percent,
           status: aiResult.status,
           reason: aiResult.reason,
-          requires_time_control: aiResult.requires_time_control
+          requires_time_control: aiResult.requires_time_control,
+          contentSnippetUsed: contentSnippet ? (contentSnippet.substring(0, 200) + (contentSnippet.length > 200 ? '...' : '')) : 'N/A'
         });
         
         // Check if time control is required

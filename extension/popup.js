@@ -141,6 +141,25 @@ async function handleStartFocus() {
   }
   
   try {
+    // Check if keywords have changed
+    const previousKeywords = (await chrome.storage.local.get(['focusKeywords'])).focusKeywords;
+    const keywordsChanged = previousKeywords && previousKeywords !== keywords;
+    
+    // If keywords changed, clear the cache
+    if (keywordsChanged) {
+      console.log('Focus keywords changed, clearing cache...');
+      // Send message to background script to clear cache
+      chrome.runtime.sendMessage({
+        action: 'clearCache'
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Error clearing cache:', chrome.runtime.lastError);
+        } else if (response && response.success) {
+          console.log('✅ Cache cleared successfully');
+        }
+      });
+    }
+    
     // Save keywords to storage
     await chrome.storage.local.set({
       focusKeywords: keywords,

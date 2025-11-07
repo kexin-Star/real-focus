@@ -34,6 +34,7 @@ function extractPageContent() {
   }
 
   // Extract and preprocess content snippet
+  // This will use enhanced logic to exclude sidebar, footer, and other noise
   content.content_snippet = extractContentSnippet();
 
   return content;
@@ -41,7 +42,8 @@ function extractPageContent() {
 
 /**
  * Extract and preprocess content snippet (max 500 characters)
- * Priority: description > h1 > first paragraph > title
+ * Priority: description > h1 > core content area > first paragraph > title
+ * Enhanced with exclusion logic for sidebar, footer, and other noise
  * @returns {string} Preprocessed content snippet
  */
 function extractContentSnippet() {
@@ -56,65 +58,191 @@ function extractContentSnippet() {
     }
   }
 
-  // Priority 2: H1 heading
+  // Priority 2: H1 heading (but exclude if it's in excluded containers)
   const h1Element = document.querySelector('h1');
   if (h1Element) {
-    snippet = h1Element.textContent.trim();
-    if (snippet.length <= MAX_SNIPPET_LENGTH) {
-      return preprocessText(snippet);
+    // Check if h1 is in an excluded container
+    const isInExcluded = isElementInExcludedContainer(h1Element);
+    if (!isInExcluded) {
+      snippet = h1Element.textContent.trim();
+      if (snippet.length <= MAX_SNIPPET_LENGTH) {
+        return preprocessText(snippet);
+      }
     }
   }
 
-  // Priority 3: First meaningful paragraph
-  const paragraphs = document.querySelectorAll('p');
-  for (const p of paragraphs) {
+  // Priority 3: Core content areas (e.g., search results, main feeds)
+  // First, try to find core content containers
+  const coreContentSelectors = [
+    '.main-content',
+    '.feeds-page',
+    '#note-content',
+    '.search-result',
+    '.search-results',
+    '.result-list',
+    '.feed-list',
+    '.content-list',
+    '[class*="feed"]',
+    '[class*="result"]',
+    '[class*="search"]',
+    'main',
+    'article',
+    '[role="main"]'
+  ];
+
+  for (const selector of coreContentSelectors) {
+    const coreElement = document.querySelector(selector);
+    if (coreElement) {
+      // Clone the element to avoid modifying the original DOM
+      const clonedElement = coreElement.cloneNode(true);
+      
+      // Remove excluded elements from the clone
+      removeExcludedElements(clonedElement);
+      
+      // Try to find meaningful paragraphs in the core area
+      const paragraphs = clonedElement.querySelectorAll('p');
+      for (const p of paragraphs) {
+        const text = p.textContent.trim();
+        if (text.length > 20) {
+          snippet = text;
+          if (snippet.length <= MAX_SNIPPET_LENGTH) {
+            return preprocessText(snippet);
+          }
+          return preprocessText(snippet);
+        }
+      }
+      
+      // If no paragraphs, try to get text from the core element itself
+      const coreText = clonedElement.innerText || clonedElement.textContent || '';
+      if (coreText.trim().length > 20) {
+        snippet = coreText.trim();
+        return preprocessText(snippet);
+      }
+    }
+  }
+
+  // Priority 4: First meaningful paragraph (from entire page, but exclude noise)
+  const allParagraphs = document.querySelectorAll('p');
+  for (const p of allParagraphs) {
+    // Skip if paragraph is in excluded container
+    if (isElementInExcludedContainer(p)) {
+      continue;
+    }
+    
     const text = p.textContent.trim();
-    if (text.length > 20) { // Skip very short paragraphs
+    if (text.length > 20) {
       snippet = text;
       if (snippet.length <= MAX_SNIPPET_LENGTH) {
         return preprocessText(snippet);
       }
-      // If paragraph is longer than max, take first part
       return preprocessText(snippet);
     }
   }
-  
-  // Priority 3.5: Try to get main content from common content containers
-  const mainSelectors = [
-    'main',
-    'article',
-    '[role="main"]',
-    '.content',
-    '.main-content',
-    '#content',
-    '#main'
-  ];
-  
-  for (const selector of mainSelectors) {
-    const mainElement = document.querySelector(selector);
-    if (mainElement) {
-      const mainText = mainElement.innerText || mainElement.textContent || '';
-      if (mainText.trim().length > 20) {
-        snippet = mainText.trim();
-        return preprocessText(snippet);
-      }
-    }
-  }
 
-  // Priority 4: Title
+  // Priority 5: Title
   const titleElement = document.querySelector('title');
   if (titleElement) {
     snippet = titleElement.textContent.trim();
   }
 
-  // If snippet is still empty, try to get any visible text
+  // Priority 6: Fallback - get text from body but exclude noise
   if (!snippet || snippet.length === 0) {
-    const bodyText = document.body.innerText || document.body.textContent || '';
+    // Clone body to avoid modifying original DOM
+    const bodyClone = document.body.cloneNode(true);
+    removeExcludedElements(bodyClone);
+    const bodyText = bodyClone.innerText || bodyClone.textContent || '';
     snippet = bodyText.trim();
   }
 
   // Preprocess and truncate to 500 characters
   return preprocessText(snippet);
+}
+
+/**
+ * Check if an element is inside an excluded container
+ * @param {HTMLElement} element - Element to check
+ * @returns {boolean} - True if element is in excluded container
+ */
+function isElementInExcludedContainer(element) {
+  const excludedSelectors = [
+    '#side-bar',
+    '.side-bar',
+    '.sidebar',
+    '.footer-container',
+    'footer',
+    '.app-info',
+    '.corp-info',
+    '.copyright',
+    '[class*="footer"]',
+    '[class*="sidebar"]',
+    '[class*="side-bar"]',
+    '[id*="footer"]',
+    '[id*="sidebar"]',
+    '[id*="side-bar"]',
+    '.icp',
+    '.beian',
+    '.备案'
+  ];
+  
+  let current = element;
+  while (current && current !== document.body) {
+    for (const selector of excludedSelectors) {
+      if (current.matches && current.matches(selector)) {
+        return true;
+      }
+      // Check if current element is a child of excluded container
+      const excludedParent = current.closest(selector);
+      if (excludedParent) {
+        return true;
+      }
+    }
+    current = current.parentElement;
+  }
+  return false;
+}
+
+/**
+ * Remove excluded elements from a cloned DOM element
+ * @param {HTMLElement} element - Cloned element to clean
+ */
+function removeExcludedElements(element) {
+  const excludedSelectors = [
+    '#side-bar',
+    '.side-bar',
+    '.sidebar',
+    '.footer-container',
+    'footer',
+    '.app-info',
+    '.corp-info',
+    '.copyright',
+    '[class*="footer"]',
+    '[class*="sidebar"]',
+    '[class*="side-bar"]',
+    '[id*="footer"]',
+    '[id*="sidebar"]',
+    '[id*="side-bar"]',
+    '.icp',
+    '.beian',
+    '.备案',
+    'nav',
+    'header',
+    '[role="navigation"]',
+    '[role="banner"]',
+    '[role="complementary"]'
+  ];
+  
+  excludedSelectors.forEach(selector => {
+    try {
+      const excludedElements = element.querySelectorAll(selector);
+      excludedElements.forEach(el => {
+        if (el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+      });
+    } catch (e) {
+      // Ignore selector errors
+    }
+  });
 }
 
 /**
