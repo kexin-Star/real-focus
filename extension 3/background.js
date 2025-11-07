@@ -173,38 +173,12 @@ async function clearOldCache() {
  */
 async function extractContentFromTab(tabId) {
   try {
-    // Wait a bit for content script to be ready (especially for dynamically loaded pages)
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    // Try to send message to content script
-    let response;
-    try {
-      response = await chrome.tabs.sendMessage(tabId, { action: 'extractContent' });
-    } catch (error) {
-      // Content script might not be loaded, try to inject it
-      console.log('Content script not found, attempting to inject...');
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          files: ['content.js']
-        });
-        // Wait for content script to initialize
-        await new Promise(resolve => setTimeout(resolve, 300));
-        // Retry sending message
-        response = await chrome.tabs.sendMessage(tabId, { action: 'extractContent' });
-      } catch (injectError) {
-        console.warn('Could not inject content script:', injectError.message);
-        return null;
-      }
-    }
-    
+    const response = await chrome.tabs.sendMessage(tabId, { action: 'extractContent' });
     if (response && response.success) {
       return response.content;
-    } else {
-      console.warn('Content extraction failed:', response?.error || 'Unknown error');
     }
   } catch (error) {
-    console.warn('Could not extract content from tab:', error.message);
+    console.warn('Could not extract content from tab (may not have content script):', error);
   }
   return null;
 }

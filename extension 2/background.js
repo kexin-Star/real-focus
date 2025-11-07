@@ -173,38 +173,12 @@ async function clearOldCache() {
  */
 async function extractContentFromTab(tabId) {
   try {
-    // Wait a bit for content script to be ready (especially for dynamically loaded pages)
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    // Try to send message to content script
-    let response;
-    try {
-      response = await chrome.tabs.sendMessage(tabId, { action: 'extractContent' });
-    } catch (error) {
-      // Content script might not be loaded, try to inject it
-      console.log('Content script not found, attempting to inject...');
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          files: ['content.js']
-        });
-        // Wait for content script to initialize
-        await new Promise(resolve => setTimeout(resolve, 300));
-        // Retry sending message
-        response = await chrome.tabs.sendMessage(tabId, { action: 'extractContent' });
-      } catch (injectError) {
-        console.warn('Could not inject content script:', injectError.message);
-        return null;
-      }
-    }
-    
+    const response = await chrome.tabs.sendMessage(tabId, { action: 'extractContent' });
     if (response && response.success) {
       return response.content;
-    } else {
-      console.warn('Content extraction failed:', response?.error || 'Unknown error');
     }
   } catch (error) {
-    console.warn('Could not extract content from tab:', error.message);
+    console.warn('Could not extract content from tab (may not have content script):', error);
   }
   return null;
 }
@@ -218,8 +192,7 @@ async function extractContentFromTab(tabId) {
  * @returns {Promise<Object>} - AI result
  */
 async function callAIAPI(keywords, title, url, extractedContent = null) {
-  // Use the latest deployed API URL (same as test scripts)
-  const apiUrl = 'https://real-focus-32cpqcsg8-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant';
+  const apiUrl = 'https://real-focus-a79c571mm-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant';
   
   // Use extracted content if available, otherwise fallback to title
   let contentTitle = title;
@@ -288,32 +261,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         }
         
-        // Prepare content for API call
-        let contentTitle = title;
-        let contentSnippet = '';
-        
-        if (extractedContent) {
-          contentTitle = extractedContent.title || extractedContent.h1 || title;
-          contentSnippet = extractedContent.content_snippet || '';
-        }
-        
         // Call API with extracted content
-        console.log('Calling API with:', {
-          keywords,
-          title: contentTitle,
-          url,
-          hasContentSnippet: !!contentSnippet,
-          contentSnippetLength: contentSnippet?.length || 0
-        });
-        
-        const aiResult = await callAIAPI(keywords, contentTitle, url, extractedContent);
-        
-        console.log('API Response:', {
-          relevance_score_percent: aiResult.relevance_score_percent,
-          status: aiResult.status,
-          reason: aiResult.reason,
-          requires_time_control: aiResult.requires_time_control
-        });
+        const aiResult = await callAIAPI(keywords, title, url, extractedContent);
         
         // Check if time control is required
         if (aiResult.requires_time_control === true) {

@@ -246,6 +246,8 @@ export default async function handler(req, res) {
 [Objective]
 Evaluate how directly the following webpage supports the user's current task based on the <TASK_KEYWORDS>. You will provide a final corrected relevance score that replaces the initial semantic similarity score.
 
+**CRITICAL REMINDER**: Before scoring, check if the page matches the Documentation Value Rule (section 3). If it does, you MUST assign a score between 70-90%, regardless of semantic similarity or content analysis.
+
 [Input]
 
 <TASK_KEYWORDS>${keywords}</TASK_KEYWORDS>
@@ -278,25 +280,44 @@ The <SEMANTIC_SIMILARITY_SCORE> (0-100) is calculated using Embedding similarity
      * Account management or authentication pages for required services
      * Development environment setup or configuration pages
      * Version control or project management tools related to the task
+   
+   **3. Documentation Value Rule (MANDATORY - HIGHEST PRIORITY):**
+   - **STEP 1: Check if URL or Title contains documentation keywords**: Look for 'docs', 'documentation', 'errors', 'error', 'api', 'reference', 'guide', 'tutorial', 'getting-started', 'quickstart', 'examples', 'example', 'how-to', 'howto', 'faq', 'help', 'support', 'manual', 'handbook', 'playbook', 'cheatsheet', 'cheat-sheet', 'reference', 'spec', 'specification'.
+   - **STEP 2: Check if domain is a development tool chain**: Check if the domain (from <WEBPAGE_URL>) belongs to: vercel.com, github.com, gitlab.com, npmjs.com, stackoverflow.com, gemini.google.com, chat.openai.com, claude.ai, openai.com, anthropic.com, developer.mozilla.org, nodejs.org, react.dev, vuejs.org, angular.io, nextjs.org, nuxt.com, or their subdomains (e.g., docs.vercel.com, docs.github.com).
+   - **STEP 3: If BOTH conditions are met**: This page is **essential technical support** for completing the task. **YOU MUST assign a score between 70% and 90%**. Do NOT assign a score below 70% for these pages.
+   - **Rationale**: Documentation, error guides, API references, and tutorials from reputable development tool chains are critical resources for any development task, even if the semantic similarity is low. They provide necessary technical information that directly supports productivity.
+   - **Examples that MUST score 70-90%**:
+     * vercel.com/docs/errors/... → 70-90% (contains 'docs' and 'errors', domain is vercel.com)
+     * github.com/docs/... → 70-90% (contains 'docs', domain is github.com)
+     * developer.mozilla.org/en-US/docs/... → 70-90% (contains 'docs', domain is developer.mozilla.org)
+     * nodejs.org/api/... → 70-90% (contains 'api', domain is nodejs.org)
+   - **This rule takes precedence over semantic similarity score. Even if semantic score is 15%, if this rule applies, you MUST assign 70-90%.**
 
-3. **Correction Instruction:**
+4. **Correction Instruction:**
    - **Ignore the interference of the initial semantic score on your final judgment.**
    - **Based on your domain knowledge and process reasoning, directly provide the final corrected score (0-100) that reflects the true relevance to the user's task.**
    - The corrected score should replace the semantic score, not complement it.
+   - **CRITICAL**: Apply the Documentation Value Rule (section 3) **BEFORE** applying general scoring guidelines. If a page matches the documentation criteria, you MUST assign a score between 70-90%.
 
-4. **Scoring Guidelines (0–100):**
+5. **Scoring Guidelines (0–100):**
    • 90–100 → Directly relevant core tools, docs, tutorials, essential resources, or necessary process pages.
-   • 50–89 → Partially relevant (search results, discussion, related topics, helpful but not essential), or supporting process pages.
-   • <50 → Irrelevant, social media, entertainment, ads, news, shopping, or clickbait.
+   • 70–89 → **Highly relevant supporting tools, documentation, error guides, API references, or tools that significantly help the task. This range is MANDATORY for tool chain documentation pages (see Documentation Value Rule in section 3).**
+   • 50–69 → Partially relevant (search results, discussion, related topics, helpful but not essential), or supporting process pages.
+   • 30–49 → Somewhat related but not directly supporting the task.
+   • <30 → Irrelevant, social media, entertainment, ads, news, shopping, or clickbait.
 
-5. **Penalty:** If content includes many unrelated or emotional words (e.g. gossip, celebrities, memes, trending slang), decrease the score.
+6. **Penalty:** If content includes many unrelated or emotional words (e.g. gossip, celebrities, memes, trending slang), decrease the score. **However, do NOT apply this penalty to tool chain documentation pages that match the Documentation Value Rule.**
 
-6. **Language:** Detect the language of <TASK_KEYWORDS> and respond in the same language.
+7. **Language:** Detect the language of <TASK_KEYWORDS> and respond in the same language.
 
 [Output Format]
 Output JSON only. You must provide:
 - "relevance_score_percent": Your final corrected score (0-100, integer) that replaces the semantic score
 - "reason": Brief explanation of your judgment (<25 words, in the same language as TASK_KEYWORDS)
+
+**FINAL CHECK BEFORE OUTPUT**: 
+- If the page URL or title contains documentation keywords (docs, errors, api, reference, guide, etc.) AND the domain is a development tool chain (vercel.com, github.com, etc.), your score MUST be between 70-90.
+- Do NOT output a score below 70 for tool chain documentation pages, even if you think the content is not directly related to the task keywords.
 
 {
   "relevance_score_percent": [integer 0–100],
@@ -336,8 +357,8 @@ Output JSON only. You must provide:
      * even if semantic similarity is low
      */
     const metaTaskKeywords = {
-      chinese: ['用量', '账单', '配置', '密钥', '文档', '控制台'],
-      english: ['usage', 'billing', 'api key', 'console', 'dashboard', 'github', 'gitlab', 'vercel', 'login', 'auth', 'settings', 'account', 'profile', 'documentation', 'docs']
+      chinese: ['用量', '账单', '配置', '密钥', '文档', '控制台', '部署', '教程', '指南'],
+      english: ['usage', 'billing', 'api key', 'console', 'dashboard', 'github', 'gitlab', 'vercel', 'login', 'auth', 'settings', 'account', 'profile', 'documentation', 'docs', 'deploy', 'deployment', 'tutorial', 'guide']
     };
 
     /**
@@ -433,8 +454,9 @@ Output JSON only. You must provide:
     // ============================================
     // Special Case: Meta-Task search on interference domain
     // ============================================
-    // Check if URL/Title contains Meta-Task keywords AND domain is in blacklist
-    const combinedText = `${url} ${title}`.toLowerCase();
+    // Check if URL/Title/Content contains Meta-Task keywords AND domain is in blacklist
+    // Include content_snippet in the check to catch cases where keywords are in content but not URL/Title
+    const combinedText = `${url} ${title} ${content_snippet || ''}`.toLowerCase();
     const hasMetaTaskKeyword = metaTaskKeywords.chinese.some(k => combinedText.includes(k.toLowerCase())) ||
                                metaTaskKeywords.english.some(k => combinedText.includes(k.toLowerCase()));
     
@@ -486,6 +508,49 @@ Output JSON only. You must provide:
     let usedGPT = false;
 
     // ============================================
+    // Tool Chain Domain Detection
+    // ============================================
+    // List of development tool domains that should always go through GPT analysis
+    // even if semantic score is low (to avoid false negatives)
+    const TOOL_CHAIN_DOMAINS = [
+      'vercel.com',
+      'github.com',
+      'gitlab.com',
+      'npmjs.com',
+      'stackoverflow.com',
+      'gemini.google.com',
+      'chat.openai.com',
+      'claude.ai',
+      'cursor.sh',
+      'openai.com',
+      'anthropic.com',
+      'docs.github.com',
+      'docs.vercel.com',
+      'developer.mozilla.org',
+      'nodejs.org',
+      'react.dev',
+      'vuejs.org',
+      'angular.io',
+      'nextjs.org',
+      'nuxt.com'
+    ];
+
+    // Check if current domain is a tool chain domain
+    const isToolChainDomain = extractedDomain && TOOL_CHAIN_DOMAINS.some(toolDomain => {
+      const matches = extractedDomain === toolDomain || 
+                      extractedDomain.endsWith('.' + toolDomain) ||
+                      extractedDomain.includes(toolDomain);
+      if (matches) {
+        console.log(`🔧 Tool chain domain matched: ${extractedDomain} matches ${toolDomain}`);
+      }
+      return matches;
+    });
+    
+    if (extractedDomain) {
+      console.log(`🔍 Domain check: ${extractedDomain}, isToolChainDomain: ${isToolChainDomain}`);
+    }
+
+    // ============================================
     // Tier 1: High Relevance (Fast Pass) - Skip GPT
     // ============================================
     if (semantic_score >= 75) {
@@ -501,8 +566,11 @@ Output JSON only. You must provide:
     // ============================================
     // Tier 2: Low Relevance (Fast Block) - Skip GPT
     // ============================================
-    else if (semantic_score <= 35) {
+    // Updated: Fast Block threshold moved from <=35 to <=20
+    // Exception: Tool chain domains always go through GPT (even if score <= 20)
+    else if (semantic_score <= 20 && !isToolChainDomain) {
       console.log(`Low relevance detected (score: ${semantic_score}), using fast block (no GPT)`);
+      console.log(`   Domain: ${extractedDomain} is NOT a tool chain domain, skipping GPT`);
       
       // Use a low score in the range 10-20 (simplified to 15)
       final_score = 15;
@@ -514,9 +582,16 @@ Output JSON only. You must provide:
     // ============================================
     // Tier 3: Ambiguous Relevance (Deep Analysis) - Use GPT
     // ============================================
+    // Updated: GPT analysis range expanded from (35, 75) to (20, 75)
+    // Also includes tool chain domains even if score <= 20
     else {
-      // Semantic score is between 35 and 75 (inclusive boundaries)
-      console.log(`Ambiguous relevance (score: ${semantic_score}), using GPT deep analysis`);
+      // Semantic score is between 20 and 75 (inclusive boundaries)
+      // OR it's a tool chain domain (even if score <= 20)
+      if (isToolChainDomain && semantic_score <= 20) {
+        console.log(`Tool chain domain detected (${extractedDomain}), forcing GPT analysis despite low score (${semantic_score})`);
+      } else {
+        console.log(`Ambiguous relevance (score: ${semantic_score}), using GPT deep analysis`);
+      }
       usedGPT = true;
       
       // Build prompt with semantic score included

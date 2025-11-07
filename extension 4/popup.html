@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=380, initial-scale=1.0, user-scalable=no">
+  <title>Real Focus Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+  <style>
+    html, body {
+      width: 600px !important;
+      height: 300px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow-x: hidden !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Frame 1: Input State -->
+  <div id="input-state" class="state-container">
+    <div class="input-panel">
+      <h2 class="question-text">What are you focusing on?</h2>
+      <input 
+        type="text" 
+        id="keywordsInput" 
+        class="keyword-input" 
+        placeholder="e.g. using figma to design a prototype"
+      >
+      <p class="hint-text">p.s. The more details you tell, the more powerful focus assistant.</p>
+      <button id="startButton" class="start-button">Start Focus</button>
+    </div>
+  </div>
+
+  <!-- Frame 2: Focused State -->
+  <div id="focused-state" class="state-container hidden">
+    <div class="focused-panel">
+      <!-- Top Content Block: Subject & Timer -->
+      <div class="content-block">
+        <div class="subject-section">
+          <label class="section-label">Subject</label>
+          <div class="subject-display">
+            <span id="subjectDisplay" class="subject-text">using figma to design a prototype</span>
+            <button id="editSubjectButton" class="edit-button" aria-label="Edit subject">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        <div class="timer-section">
+          <div class="timer-control">
+            <button id="pauseButton" class="timer-button" aria-label="Pause timer">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+              </svg>
+            </button>
+            <span class="timer-label">start</span>
+          </div>
+          <div class="focused-time">
+            <label class="section-label">focused time</label>
+            <div id="focusedTimeDisplay" class="time-display">00:00:00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Content Block: Site Relevance -->
+      <div class="content-block">
+        <div class="site-section">
+          <label class="section-label">Current site</label>
+          <div id="currentSiteDisplay" class="site-url">www.xiaohongshu.com/sjkdfej/dfd</div>
+        </div>
+        
+        <div class="relevance-section">
+          <label class="section-label">Relevant</label>
+          <div id="relevanceScoreDisplay" class="score-display score-high">85%</div>
+        </div>
+        
+        <div class="status-section">
+          <label class="section-label">Status</label>
+          <div id="statusDisplay" class="status-display status-stay">Stay</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Frame 3: Paused State -->
+  <div id="paused-state" class="state-container hidden">
+    <div class="focused-panel">
+      <!-- Top Content Block: Subject & Timer -->
+      <div class="content-block">
+        <div class="subject-section">
+          <label class="section-label">Subject</label>
+          <div class="subject-display">
+            <span id="subjectDisplayPaused" class="subject-text">using figma to design a prototype</span>
+            <button id="editSubjectButtonPaused" class="edit-button" aria-label="Edit subject">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        <div class="timer-section">
+          <div class="timer-control">
+            <button id="resumeButton" class="timer-button" aria-label="Resume timer">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </button>
+            <span class="timer-label">pause</span>
+          </div>
+          <div class="focused-time">
+            <label class="section-label">focused time</label>
+            <div id="focusedTimeDisplayPaused" class="time-display">00:00:01</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Content Block: Site Relevance -->
+      <div class="content-block">
+        <div class="site-section">
+          <label class="section-label">Current site</label>
+          <div id="currentSiteDisplayPaused" class="site-url">www.xiaohongshu.com/sjkdfej/dfd</div>
+        </div>
+        
+        <div class="relevance-section">
+          <label class="section-label">Relevant</label>
+          <div id="relevanceScoreDisplayPaused" class="score-display score-medium">45%</div>
+        </div>
+        
+        <div class="status-section">
+          <label class="section-label">Status</label>
+          <div id="statusDisplayPaused" class="status-display status-block">Block</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+

@@ -74,30 +74,7 @@ function extractContentSnippet() {
       if (snippet.length <= MAX_SNIPPET_LENGTH) {
         return preprocessText(snippet);
       }
-      // If paragraph is longer than max, take first part
-      return preprocessText(snippet);
-    }
-  }
-  
-  // Priority 3.5: Try to get main content from common content containers
-  const mainSelectors = [
-    'main',
-    'article',
-    '[role="main"]',
-    '.content',
-    '.main-content',
-    '#content',
-    '#main'
-  ];
-  
-  for (const selector of mainSelectors) {
-    const mainElement = document.querySelector(selector);
-    if (mainElement) {
-      const mainText = mainElement.innerText || mainElement.textContent || '';
-      if (mainText.trim().length > 20) {
-        snippet = mainText.trim();
-        return preprocessText(snippet);
-      }
+      break;
     }
   }
 
@@ -531,39 +508,13 @@ function forceBlockPage(reason, score = 15) {
 // Listen for messages from background script or popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractContent') {
-    // Use async function to handle potential delays
-    (async () => {
-      try {
-        // Wait a bit for page to be fully loaded (especially for dynamic content)
-        // This helps with pages that load content dynamically
-        if (document.readyState !== 'complete') {
-          await new Promise(resolve => {
-            if (document.readyState === 'complete') {
-              resolve();
-            } else {
-              window.addEventListener('load', resolve, { once: true });
-              // Timeout after 500ms to avoid waiting too long
-              setTimeout(resolve, 500);
-            }
-          });
-        }
-        
-        // Small delay to ensure dynamic content is rendered
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const content = getPageContent();
-        console.log('Content extracted:', {
-          title: content.title,
-          hasSnippet: !!content.content_snippet,
-          snippetLength: content.content_snippet?.length || 0,
-          snippetPreview: content.content_snippet?.substring(0, 100) || 'N/A'
-        });
-        sendResponse({ success: true, content });
-      } catch (error) {
-        console.error('Error extracting content:', error);
-        sendResponse({ success: false, error: error.message });
-      }
-    })();
+    try {
+      const content = getPageContent();
+      sendResponse({ success: true, content });
+    } catch (error) {
+      console.error('Error extracting content:', error);
+      sendResponse({ success: false, error: error.message });
+    }
     return true; // Keep message channel open for async response
   }
 
