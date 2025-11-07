@@ -218,8 +218,10 @@ async function extractContentFromTab(tabId) {
  * @returns {Promise<Object>} - AI result
  */
 async function callAIAPI(keywords, title, url, extractedContent = null) {
-  // Use the latest deployed API URL
-  const apiUrl = 'https://real-focus-32cpqcsg8-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant';
+  // Use local API for testing, change back to deployed URL before pushing
+  // Local: http://localhost:3000/api/focus-assistant
+  // Deployed: https://real-focus-32cpqcsg8-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant
+  const apiUrl = 'http://localhost:3000/api/focus-assistant';
   
   // Use extracted content if available, otherwise fallback to title
   let contentTitle = title;

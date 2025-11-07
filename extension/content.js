@@ -22,9 +22,14 @@ function extractPageContent() {
   }
 
   // Extract <h1>
-  const h1Element = document.querySelector('h1');
-  if (h1Element) {
-    content.h1 = h1Element.textContent.trim();
+  // Skip H1 for Google SERP as it's usually "Accessibility Links"
+  const isGoogleSERP = window.location.hostname.includes('google.com') && 
+                        window.location.pathname.includes('/search');
+  if (!isGoogleSERP) {
+    const h1Element = document.querySelector('h1');
+    if (h1Element) {
+      content.h1 = h1Element.textContent.trim();
+    }
   }
 
   // Extract <meta name="description">
@@ -42,12 +47,110 @@ function extractPageContent() {
 
 /**
  * Extract and preprocess content snippet (max 500 characters)
- * Priority: description > h1 > core content area > first paragraph > title
+ * Priority: description > Google SERP results > h1 > core content area > first paragraph > title
  * Enhanced with exclusion logic for sidebar, footer, and other noise
  * @returns {string} Preprocessed content snippet
  */
 function extractContentSnippet() {
   let snippet = '';
+
+  // ============================================
+  // Special Case: Google Search Results Page (SERP)
+  // ============================================
+  // Check if this is a Google search results page
+  const isGoogleSERP = window.location.hostname.includes('google.com') && 
+                        window.location.pathname.includes('/search');
+  
+  if (isGoogleSERP) {
+    console.log('🔍 Google SERP detected, extracting search results...');
+    
+    // Extract search results from Google SERP
+    // Google uses various selectors: .g, .rc, .tF2Cxc, etc.
+    const searchResultSelectors = [
+      '.g',           // Classic Google results
+      '.rc',          // Rich results
+      '.tF2Cxc',      // Modern Google results
+      '[data-ved]'     // Results with data-ved attribute
+    ];
+    
+    const searchResults = [];
+    
+    // Try each selector to find search results
+    for (const selector of searchResultSelectors) {
+      const results = document.querySelectorAll(selector);
+      if (results.length > 0) {
+        console.log(`Found ${results.length} results using selector: ${selector}`);
+        
+        // Extract title and snippet from each result (limit to first 5)
+        for (let i = 0; i < Math.min(results.length, 5); i++) {
+          const result = results[i];
+          
+          // Extract title (usually in an <a> tag or <h3>)
+          let title = '';
+          const titleElement = result.querySelector('h3, a[href]');
+          if (titleElement) {
+            title = titleElement.textContent.trim();
+          }
+          
+          // Extract snippet (usually in a <span> or <div> with specific classes)
+          let snippetText = '';
+          const snippetSelectors = [
+            '.VwiC3b',      // Modern snippet class
+            '.s',           // Classic snippet class
+            '.IsZvec',      // Alternative snippet class
+            'span[style*="line-height"]', // Fallback for snippet spans
+            'div[style*="line-height"]'   // Fallback for snippet divs
+          ];
+          
+          for (const snippetSelector of snippetSelectors) {
+            const snippetElement = result.querySelector(snippetSelector);
+            if (snippetElement) {
+              snippetText = snippetElement.textContent.trim();
+              if (snippetText.length > 20) {
+                break;
+              }
+            }
+          }
+          
+          // If no snippet found, try to get text from the result container
+          if (!snippetText || snippetText.length < 20) {
+            const allText = result.textContent || result.innerText || '';
+            // Remove title from text to get snippet
+            const textWithoutTitle = allText.replace(title, '').trim();
+            if (textWithoutTitle.length > 20) {
+              snippetText = textWithoutTitle.substring(0, 200); // Limit snippet length
+            }
+          }
+          
+          // Combine title and snippet
+          if (title || snippetText) {
+            const resultText = title ? `${title}. ${snippetText}` : snippetText;
+            if (resultText.length > 20) {
+              searchResults.push(resultText);
+            }
+          }
+        }
+        
+        // If we found results, break out of selector loop
+        if (searchResults.length > 0) {
+          break;
+        }
+      }
+    }
+    
+    // Combine first 3-5 search results into snippet
+    if (searchResults.length > 0) {
+      const combinedSnippet = searchResults.slice(0, 5).join(' | ');
+      console.log(`Extracted ${searchResults.length} search results, total length: ${combinedSnippet.length}`);
+      
+      if (combinedSnippet.length > 0) {
+        return preprocessText(combinedSnippet);
+      }
+    }
+    
+    // If no search results found, fall through to normal extraction
+    console.log('⚠️ No search results found, falling back to normal extraction');
+  }
 
   // Priority 1: Meta description
   const metaDescription = document.querySelector('meta[name="description"]');
@@ -58,15 +161,18 @@ function extractContentSnippet() {
     }
   }
 
-  // Priority 2: H1 heading (but exclude if it's in excluded containers)
-  const h1Element = document.querySelector('h1');
-  if (h1Element) {
-    // Check if h1 is in an excluded container
-    const isInExcluded = isElementInExcludedContainer(h1Element);
-    if (!isInExcluded) {
-      snippet = h1Element.textContent.trim();
-      if (snippet.length <= MAX_SNIPPET_LENGTH) {
-        return preprocessText(snippet);
+  // Priority 2: H1 heading (but exclude if it's in excluded containers or Google SERP)
+  // Skip H1 for Google SERP as it's usually "Accessibility Links"
+  if (!isGoogleSERP) {
+    const h1Element = document.querySelector('h1');
+    if (h1Element) {
+      // Check if h1 is in an excluded container
+      const isInExcluded = isElementInExcludedContainer(h1Element);
+      if (!isInExcluded) {
+        snippet = h1Element.textContent.trim();
+        if (snippet.length <= MAX_SNIPPET_LENGTH) {
+          return preprocessText(snippet);
+        }
       }
     }
   }
