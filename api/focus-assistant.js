@@ -7,6 +7,127 @@
 
 import OpenAI from 'openai';
 
+// ============================================
+// Interference Domains Blacklist
+// ============================================
+/**
+ * List of interference domains (social media, entertainment, news)
+ * Meta-Task logic should NOT apply to pages on these domains
+ * even if they contain meta-task keywords
+ */
+const INTERFERENCE_DOMAINS = [
+  // Chinese social media & entertainment
+  'xiaohongshu.com',
+  'xiaohongshu.cn',
+  'weibo.com',
+  'weibo.cn',
+  'douyin.com',
+  'douyin.cn',
+  'tiktok.com',
+  'toutiao.com',
+  'zhihu.com',
+  'bilibili.com',
+  'bilibili.tv',
+  'acfun.cn',
+  'iqiyi.com',
+  'youku.com',
+  'tencent.com',
+  'qq.com',
+  'qzone.qq.com',
+  'weixin.qq.com',
+  'baidu.com',
+  'baidu.cn',
+  'sina.com.cn',
+  'sina.cn',
+  'netease.com',
+  '163.com',
+  'sohu.com',
+  'sogou.com',
+  'taobao.com',
+  'tmall.com',
+  'jd.com',
+  'pinduoduo.com',
+  'meituan.com',
+  'dianping.com',
+  'douban.com',
+  'huya.com',
+  'douyu.com',
+  'kuaishou.com',
+  'kuaishou.cn',
+  
+  // International social media & entertainment
+  'instagram.com',
+  'facebook.com',
+  'twitter.com',
+  'x.com',
+  'youtube.com',
+  'reddit.com',
+  'pinterest.com',
+  'snapchat.com',
+  'linkedin.com',
+  'tumblr.com',
+  'flickr.com',
+  'vimeo.com',
+  'twitch.tv',
+  'discord.com',
+  'telegram.org',
+  'whatsapp.com',
+  'messenger.com',
+  'tiktok.com',
+  'netflix.com',
+  'hulu.com',
+  'disney.com',
+  'disneyplus.com',
+  'hbo.com',
+  'amazon.com',
+  'amazon.cn',
+  'ebay.com',
+  'etsy.com',
+  'etsy.cn',
+  
+  // News & media
+  'cnn.com',
+  'bbc.com',
+  'nytimes.com',
+  'theguardian.com',
+  'washingtonpost.com',
+  'reuters.com',
+  'bloomberg.com',
+  'forbes.com',
+  'techcrunch.com',
+  'theverge.com',
+  'engadget.com',
+  'gizmodo.com',
+  'mashable.com',
+  'buzzfeed.com',
+  'vice.com',
+  'vox.com',
+  'medium.com',
+  'substack.com',
+  
+  // Gaming
+  'steam.com',
+  'steampowered.com',
+  'epicgames.com',
+  'roblox.com',
+  'minecraft.net',
+  'playstation.com',
+  'xbox.com',
+  'nintendo.com',
+  'riotgames.com',
+  'blizzard.com',
+  'ea.com',
+  'ubisoft.com',
+  
+  // Other distractions
+  'wikipedia.org',
+  'wikimedia.org',
+  'quora.com',
+  'stackoverflow.com', // Note: Stack Overflow can be work-related, but often leads to distraction
+  // Note: github.com, gitlab.com, vercel.com, etc. are NOT in blacklist
+  // because they are legitimate work tools that may have meta-task pages
+];
+
 export default async function handler(req, res) {
   // Set CORS headers (optional, for cross-origin requests)
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -220,43 +341,139 @@ Output JSON only. You must provide:
     };
 
     /**
+     * Extract domain from URL
+     * @param {string} url - Page URL
+     * @returns {string|null} - Domain name or null if invalid
+     */
+    function extractDomain(url) {
+      try {
+        const urlObj = new URL(url);
+        // Get hostname and remove 'www.' prefix if present
+        let hostname = urlObj.hostname.toLowerCase();
+        if (hostname.startsWith('www.')) {
+          hostname = hostname.substring(4);
+        }
+        return hostname;
+      } catch (e) {
+        // If URL parsing fails, try to extract domain manually
+        const match = url.match(/https?:\/\/(?:www\.)?([^\/]+)/i);
+        if (match) {
+          return match[1].toLowerCase();
+        }
+        return null;
+      }
+    }
+
+    /**
      * Check if a page is a Meta-Task process management page
+     * Only returns true if:
+     * 1. URL/Title contains Meta-Task keywords AND
+     * 2. Domain is NOT in the interference domains blacklist
+     * 
      * @param {string} url - Page URL
      * @param {string} title - Page title
-     * @returns {boolean} - True if page contains meta-task keywords
+     * @returns {boolean} - True if page is a valid meta-task page (not on blacklisted domain)
      */
     function isMetaTaskPage(url, title) {
       const combinedText = `${url} ${title}`.toLowerCase();
+      let hasMetaTaskKeyword = false;
       
       // Check Chinese keywords
       for (const keyword of metaTaskKeywords.chinese) {
         if (combinedText.includes(keyword.toLowerCase())) {
-          return true;
+          hasMetaTaskKeyword = true;
+          break;
         }
       }
       
-      // Check English keywords
-      for (const keyword of metaTaskKeywords.english) {
-        if (combinedText.includes(keyword.toLowerCase())) {
-          return true;
+      // Check English keywords if Chinese keywords not found
+      if (!hasMetaTaskKeyword) {
+        for (const keyword of metaTaskKeywords.english) {
+          if (combinedText.includes(keyword.toLowerCase())) {
+            hasMetaTaskKeyword = true;
+            break;
+          }
         }
       }
       
-      return false;
+      // If no meta-task keyword found, return false
+      if (!hasMetaTaskKeyword) {
+        return false;
+      }
+      
+      // Extract domain from URL
+      const domain = extractDomain(url);
+      if (!domain) {
+        // If we can't extract domain, be conservative and return false
+        console.log(`Warning: Could not extract domain from URL: ${url}`);
+        return false;
+      }
+      
+      // Check if domain is in interference blacklist
+      const isInterferenceDomain = INTERFERENCE_DOMAINS.some(interferenceDomain => {
+        // Check exact match or subdomain match
+        return domain === interferenceDomain || domain.endsWith('.' + interferenceDomain);
+      });
+      
+      if (isInterferenceDomain) {
+        console.log(`Meta-Task keyword detected but domain is blacklisted: ${domain}`);
+        return false;
+      }
+      
+      // Domain is not in blacklist, and has meta-task keyword
+      return true;
     }
 
     // Perform Meta-Task pre-check
     const isMetaTask = isMetaTaskPage(url, title);
+    const extractedDomain = extractDomain(url);
     
+    console.log(`Meta-Task check: URL=${url}, Domain=${extractedDomain}, isMetaTask=${isMetaTask}`);
+    
+    // ============================================
+    // Special Case: Meta-Task search on interference domain
+    // ============================================
+    // Check if URL/Title contains Meta-Task keywords AND domain is in blacklist
+    const combinedText = `${url} ${title}`.toLowerCase();
+    const hasMetaTaskKeyword = metaTaskKeywords.chinese.some(k => combinedText.includes(k.toLowerCase())) ||
+                               metaTaskKeywords.english.some(k => combinedText.includes(k.toLowerCase()));
+    
+    let isInterferenceDomain = false;
+    if (extractedDomain) {
+      isInterferenceDomain = INTERFERENCE_DOMAINS.some(d => 
+        extractedDomain === d || extractedDomain.endsWith('.' + d)
+      );
+    }
+    
+    // If Meta-Task keyword found AND domain is in blacklist, return early with time control flag
+    if (hasMetaTaskKeyword && isInterferenceDomain) {
+      console.log(`⏰ Meta-Task search detected on interference domain: ${extractedDomain}`);
+      console.log(`   Detected Meta-Task keywords in URL/Title, but domain is blacklisted`);
+      console.log(`   Returning early with requires_time_control=true (skip all Hybrid Reasoning)`);
+      
+      // Return early: skip all Fast Block/Fast Pass/GPT logic
+      return res.status(200).json({
+        relevance_score_percent: 50,
+        status: 'Stay',
+        reason: '检测到在干扰平台上搜索工作相关内容，建议设置时间控制',
+        requires_time_control: true
+      });
+    }
+    
+    // Continue with normal Meta-Task logic for non-blacklisted domains
     if (isMetaTask && semantic_score < 75) {
-      console.log(`Meta-Task page detected (URL: ${url}, Title: ${title})`);
-      console.log(`Original semantic score: ${semantic_score}, forcing to 50 to trigger GPT analysis`);
+      console.log(`✅ Meta-Task page detected (URL: ${url}, Title: ${title})`);
+      console.log(`   Domain: ${extractedDomain} is NOT in interference blacklist`);
+      console.log(`   Original semantic score: ${semantic_score}, forcing to 50 to trigger GPT analysis`);
       
       // Force semantic score to 50 to ensure GPT deep analysis
       // 50 is between 35 and 75, guaranteeing GPT path execution
       semantic_score = 50;
       
-      console.log(`Semantic score updated to: ${semantic_score} (will trigger GPT deep analysis)`);
+      console.log(`   Semantic score updated to: ${semantic_score} (will trigger GPT deep analysis)`);
+    } else if (!isMetaTask && hasMetaTaskKeyword && isInterferenceDomain) {
+      // This case is already handled above, but log for debugging
+      console.log(`⚠️  Meta-Task keyword found but domain ${extractedDomain} is blacklisted - handled by time control logic`);
     }
 
     // ============================================
@@ -370,7 +587,8 @@ Output JSON only. You must provide:
     return res.status(200).json({
       relevance_score_percent: final_score,
       status: status,
-      reason: reason
+      reason: reason,
+      requires_time_control: false
     });
 
   } catch (error) {

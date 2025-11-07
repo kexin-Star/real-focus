@@ -44,7 +44,7 @@ curl -X POST https://your-vercel-url/api/focus-assistant \
 ### 方法 3: 检查 Vercel Dashboard
 
 1. 访问 https://vercel.com/dashboard
-2. 找到 `real-focus` 或 `ai-focus` 项目
+2. 找到 `real-focus` 项目
 3. 查看最新的部署状态
 4. 点击部署查看日志，确认新代码已部署
 

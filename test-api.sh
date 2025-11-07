@@ -28,7 +28,7 @@ else
         if [ -n "$VERCEL_URL" ]; then
             TEST_URL="https://$VERCEL_URL/api/focus-assistant"
         else
-            TEST_URL="https://ai-focus-5osqz3ja5-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant"
+            TEST_URL="https://real-focus-5osqz3ja5-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant"
         fi
     else
         TEST_URL="https://ai-focus-5osqz3ja5-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant"

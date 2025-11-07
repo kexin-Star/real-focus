@@ -1,11 +1,15 @@
 {
   "name": "real-focus",
   "version": "1.0.0",
+  "type": "module",
   "description": "AI Focus Assistant - Vercel Serverless Function",
   "main": "api/focus-assistant.js",
   "scripts": {
-    "dev": "vercel dev",
-    "build": "echo 'No build step required'"
+    "start:dev": "vercel dev",
+    "local": "node local-server.js",
+    "build": "echo 'No build step required'",
+    "test": "node test-hybrid-strategy.js",
+    "test:local": "LOCAL_TEST=true node test-hybrid-strategy.js"
   },
   "keywords": [
     "vercel",

@@ -159,3 +159,4 @@ const API_SNIPPET_LENGTH = 200;   // 实际发送给 API 的长度（在 backgro
 3. 检查 API 调用中的 title 是否包含 content_snippet
 4. 测试没有 content script 的页面（应回退到 tab.title）
 
+

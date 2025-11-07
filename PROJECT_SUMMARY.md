@@ -138,7 +138,7 @@ extension/
 ## 📁 项目文件结构
 
 ```
-ai-focus/
+real-focus/
 ├── api/
 │   └── focus-assistant.js    # Vercel Serverless Function
 ├── extension/                 # Chrome 扩展

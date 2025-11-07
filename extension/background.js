@@ -4,6 +4,9 @@ const CACHE_KEY = 'aiCache';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const MAX_CACHE_SIZE = 4 * 1024 * 1024; // 4MB (leave 1MB buffer from 5MB limit)
 
+// Store active time control timers by tabId
+let globalTimeControlTimers = new Map();
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Real Focus Assistant installed');
   // Initialize cache if it doesn't exist
@@ -261,8 +264,54 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Call API with extracted content
         const aiResult = await callAIAPI(keywords, title, url, extractedContent);
         
-        // Store in cache
-        await setCache(url, aiResult);
+        // Check if time control is required
+        if (aiResult.requires_time_control === true) {
+          console.log('Time control required for:', url);
+          
+          // Start 30-second grace period
+          const gracePeriodMs = 30 * 1000; // 30 seconds
+          const timerId = setTimeout(async () => {
+            // Timer expired - check if user is still on the same page
+            try {
+              const currentTab = await chrome.tabs.get(tabId);
+              if (currentTab && currentTab.url === url) {
+                // User is still on the same page, force block
+                console.log('Grace period expired, forcing block for:', url);
+                chrome.tabs.sendMessage(tabId, {
+                  action: 'block_page', // New message name
+                  reason: aiResult.reason || '30秒宽限期已结束，已强制拦截该页面',
+                  score: aiResult.relevance_score_percent || 15 // Use AI's score or default to 15
+                }).catch(err => {
+                  console.warn('Could not send block_page message:', err);
+                });
+              }
+            } catch (error) {
+              console.warn('Could not check current tab:', error);
+            }
+          }, gracePeriodMs);
+          
+          // Notify content script to show countdown (new message name)
+          if (tabId) {
+            chrome.tabs.sendMessage(tabId, {
+              action: 'timer_start', // New message name
+              duration: 30, // seconds
+              message: '当前正在干扰平台进行搜索，你有 30 秒时间查看，之后将强制拦截'
+            }).catch(err => {
+              console.warn('Could not send timer_start message:', err);
+            });
+          }
+          
+          // Store timer ID for this tab (in case we need to cancel it)
+          if (!globalTimeControlTimers) {
+            globalTimeControlTimers = new Map();
+          }
+          globalTimeControlTimers.set(tabId, timerId);
+        }
+        
+        // Store in cache (but don't cache time control flag)
+        const cacheResult = { ...aiResult };
+        delete cacheResult.requires_time_control; // Don't cache this flag
+        await setCache(url, cacheResult);
         
         // Return result
         sendResponse({ 
@@ -338,6 +387,24 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   // Only trigger on completed navigation
   if (changeInfo.status === 'complete' && tab.url) {
     console.log('Tab updated:', tab.url);
+    
+    // Clear time control timer if user navigated away
+    if (globalTimeControlTimers.has(tabId)) {
+      const timerId = globalTimeControlTimers.get(tabId);
+      clearTimeout(timerId);
+      globalTimeControlTimers.delete(tabId);
+      console.log('Cleared time control timer for tab:', tabId);
+    }
+  }
+});
+
+// Clean up timers when tabs are closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (globalTimeControlTimers.has(tabId)) {
+    const timerId = globalTimeControlTimers.get(tabId);
+    clearTimeout(timerId);
+    globalTimeControlTimers.delete(tabId);
+    console.log('Cleared time control timer for closed tab:', tabId);
   }
 });
 

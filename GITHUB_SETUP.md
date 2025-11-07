@@ -40,7 +40,7 @@ git commit -m "Initial commit: Vercel Serverless Function with OpenAI integratio
 ## 步骤 5: 在 GitHub 上创建新仓库
 
 1. 访问 [GitHub](https://github.com/new)
-2. 仓库名称：`ai-focus`（或你喜欢的名称）
+2. 仓库名称：`real-focus`（或你喜欢的名称）
 3. 选择 **Public** 或 **Private**
 4. **不要**勾选 "Initialize this repository with a README"（因为我们已经有了）
 5. 点击 **Create repository**
@@ -50,7 +50,7 @@ git commit -m "Initial commit: Vercel Serverless Function with OpenAI integratio
 GitHub 会显示命令，类似这样：
 
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/ai-focus.git
+git remote add origin https://github.com/YOUR_USERNAME/real-focus.git
 git branch -M main
 git push -u origin main
 ```
@@ -60,7 +60,7 @@ git push -u origin main
 ## 步骤 7: 在 Vercel 中连接 GitHub
 
 1. 访问 [Vercel Dashboard](https://vercel.com/dashboard)
-2. 进入你的项目 `ai-focus`
+2. 进入你的项目 `real-focus`
 3. 进入 **Settings** → **Git**
 4. 点击 **Connect Git Repository**
 5. 选择你的 GitHub 仓库
@@ -81,7 +81,7 @@ git add .
 git commit -m "Initial commit: Vercel Serverless Function with OpenAI integration"
 
 # 4. 添加远程仓库（替换 YOUR_USERNAME）
-git remote add origin https://github.com/YOUR_USERNAME/ai-focus.git
+git remote add origin https://github.com/YOUR_USERNAME/real-focus.git
 
 # 5. 设置主分支
 git branch -M main

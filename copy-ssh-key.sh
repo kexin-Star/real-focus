@@ -17,7 +17,7 @@ if command -v pbcopy &> /dev/null; then
     echo "📝 下一步："
     echo "1. 访问: https://github.com/settings/keys"
     echo "2. 点击 'New SSH key'"
-    echo "3. Title: 输入 'Mac - ai-focus'（或任意描述）"
+    echo "3. Title: 输入 'Mac - real-focus'（或任意描述）"
     echo "4. Key: 按 Cmd+V 粘贴"
     echo "5. 点击 'Add SSH key'"
     echo ""

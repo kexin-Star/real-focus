@@ -270,3 +270,4 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
 - 通过 popup 打开时检查当前标签页来解决这个问题
 - 数据同步确保两个状态始终显示相同的数据
 
+
