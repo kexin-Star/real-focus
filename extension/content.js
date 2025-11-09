@@ -863,6 +863,41 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  // Handle show_block_ui message (immediate block)
+  if (request.action === 'show_block_ui') {
+    try {
+      const reason = request.reason || '页面与专注主题不相关';
+      const score = request.score || 15;
+      forceBlockPage(reason, score);
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('Error showing block UI:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+    return true;
+  }
+
+  // Handle remove_ui message (remove all UI elements)
+  if (request.action === 'remove_ui') {
+    try {
+      // Remove time control banner if exists
+      removeTimeControlBanner();
+      
+      // Remove block overlay if exists
+      const blockOverlay = document.getElementById('real-focus-block-overlay');
+      if (blockOverlay) {
+        blockOverlay.remove();
+        document.body.style.overflow = ''; // Restore scrolling
+      }
+      
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('Error removing UI:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+    return true;
+  }
+
   return false;
 });
 

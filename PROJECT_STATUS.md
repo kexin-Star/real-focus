@@ -1,6 +1,6 @@
 # Real Focus Assistant - 项目状态总结
 
-> 最后更新: 2025-01-07
+> 最后更新: 2025-11-07
 
 ## 📋 项目概述
 
@@ -62,6 +62,11 @@
 - **内容提取**: 智能提取页面标题、H1、Meta 描述、内容摘要
 - **干扰内容排除**: 自动排除边栏、页脚、备案信息等干扰内容
 - **核心内容识别**: 优先从搜索结果、Feed 列表等核心区域提取
+- **Google SERP 特殊处理**: 
+  - 检测 Google 搜索结果页
+  - 跳过 H1 标签（通常是 "Accessibility Links"）
+  - 优先提取前 3-5 个搜索结果的标题和摘要
+  - 支持多种 Google 搜索结果选择器（.g, .rc, .tF2Cxc 等）
 - **UI 注入**: 显示时间控制倒计时和拦截界面
 
 #### 2.3 Popup UI (`extension/popup.js`)
@@ -79,9 +84,10 @@
 #### 3.2 测试脚本
 - `test-hybrid-strategy.js`: 交互式测试混合判断策略
 - `test-threshold-update.js`: 测试阈值调整
-- `test-stock-cases.js`: 测试特定用例
+- `test-stock-cases.js`: 测试特定用例（炒股相关）
 - `test-xiaohongshu.js`: 测试小红书页面
 - `test-with-snippet-display.js`: 显示 Content Snippet
+- `test-google-serp.js`: 测试 Google 搜索结果页内容提取
 
 ---
 
@@ -149,10 +155,10 @@
 ```
 real-focus/
 ├── api/
-│   └── focus-assistant.js          # 核心 API 逻辑 (722 行)
+│   └── focus-assistant.js          # 核心 API 逻辑 (721 行)
 ├── extension/
-│   ├── background.js               # Service Worker (468 行)
-│   ├── content.js                   # Content Script (638 行)
+│   ├── background.js               # Service Worker (466 行)
+│   ├── content.js                   # Content Script (872 行)
 │   ├── popup.js                     # Popup UI (427 行)
 │   ├── popup.html                   # Popup HTML
 │   ├── popup.css                    # Popup 样式
@@ -162,75 +168,70 @@ real-focus/
 ├── vercel.json                      # Vercel 配置
 └── [测试脚本和文档]
 
-总代码行数: ~2,379 行 (核心代码)
+总代码行数: ~2,483 行 (核心代码)
 ```
 
 ---
 
-## 🗑️ 可清理删除的文档
+## 📚 项目文档
 
-### 已完成的修复文档（可删除）
-这些文档记录了已完成的修复过程，可以归档或删除：
-
-1. **FIX_COMPLETE.md** - 修复完成记录
-2. **FIX_DASHBOARD_STEPS.md** - Dashboard 修复步骤
-3. **FIX_RECURSIVE_ERROR.md** - 递归错误修复
-4. **FIX_VERCEL_DEV_ERROR.md** - Vercel Dev 错误修复
-5. **RENAME_COMPLETE.md** - 重命名完成记录
-6. **OPENAI_429_FIX.md** - OpenAI 429 错误修复
-
-### 过时的测试结果文档（可删除）
-7. **TEST_RESULTS.md** - 旧版测试结果
-8. **TEST_RESULTS_V5.md** - V5 测试结果
-9. **INTERACTIVE_TEST.md** - 交互式测试说明
-
-### 重复的文档（可合并或删除）
-10. **LOCAL_TESTING.md** - 本地测试说明（与 LOCAL_TEST_SETUP.md 重复）
-11. **LOCAL_TEST_SETUP.md** - 本地测试设置（可保留，删除 LOCAL_TESTING.md）
-12. **START_SERVER.md** - 服务器启动说明（内容已整合到其他文档）
-13. **EXPLAIN_DEV_SCRIPT.md** - 开发脚本说明（内容已过时）
-
-### 临时测试脚本（可删除）
-14. **test-api-v5.js** - V5 API 测试（已过时）
-15. **test-api.sh** - Shell 测试脚本（已过时）
-16. **test-single.js** - 单次测试脚本（已过时）
-17. **test-focus.js** - 旧版测试脚本（已过时）
-18. **test-meta-task-fix.js** - Meta-Task 修复测试（已过时）
-19. **test-time-control.js** - 时间控制测试（已过时）
-20. **test-with-cache-comparison.js** - 缓存对比测试（临时测试）
-
-### 备份文件夹（可删除）
-21. **extension 2/** - 备份文件夹
-22. **extension 3/** - 备份文件夹
-23. **extension 4/** - 备份文件夹
-24. **extension.zip** - 打包文件（已改用直接使用 extension 文件夹）
-
-### 建议保留的文档
+### 核心文档
 - **README.md** - 项目主文档
-- **PROJECT_SUMMARY.md** - 项目总结（可更新）
+- **PROJECT_STATUS.md** - 项目状态总结（本文档）
+- **PROJECT_SUMMARY.md** - 项目总结
 - **QUICK_START.md** - 快速开始指南
-- **LOCAL_TEST_CHECKLIST.md** - 本地测试检查清单（最新）
-- **HYBRID_REASONING_THRESHOLD_UPDATE.md** - 阈值更新说明
+
+### 功能文档
+- **HYBRID_REASONING_THRESHOLD_UPDATE.md** - 混合判断阈值更新说明
 - **TOOLCHAIN_KEYWORD_FIX.md** - 工具链关键词修复说明
 - **TIME_CONTROL_FEATURE.md** - 时间控制功能说明
 - **META_TASK_FIX.md** - Meta-Task 修复说明
-- **GITHUB_SETUP.md** - GitHub 设置说明（如果需要）
-- **PUSH_TO_GITHUB.md** - Git 推送说明（如果需要）
+- **GOOGLE_SERP_FIX.md** - Google 搜索结果页内容提取修复
+
+### 使用指南
+- **LOCAL_TEST_CHECKLIST.md** - 本地测试检查清单
+- **LOCAL_TEST_SETUP.md** - 本地测试设置
+- **GITHUB_SETUP.md** - GitHub 设置说明
+- **PUSH_TO_GITHUB.md** - Git 推送说明
+
+### 开发文档
+- **FRONTEND_STATUS.md** - 前端开发进度和 UI 实现
+
+### 测试脚本
+- `test-hybrid-strategy.js` - 交互式测试混合判断策略
+- `test-threshold-update.js` - 测试阈值调整
+- `test-stock-cases.js` - 测试特定用例（炒股相关）
+- `test-xiaohongshu.js` - 测试小红书页面
+- `test-with-snippet-display.js` - 显示 Content Snippet
+- `test-google-serp.js` - 测试 Google 搜索结果页内容提取
 
 ---
 
 ## 🔄 当前开发状态
 
 ### 最新修改 (2025-11-07)
+
+#### 已完成的功能
 1. ✅ **工具链关键词检测**: 在 Fast Block 之前检测工具链关键词，强制提升分数
 2. ✅ **内容提取优化**: 排除边栏、页脚等干扰内容，优先提取核心搜索结果
-3. ✅ **缓存清理**: 修改专注主题时自动清理缓存
-4. ✅ **日志增强**: 添加 Content Snippet 预览到日志
+3. ✅ **Google SERP 内容提取**: 
+   - 检测 Google 搜索结果页
+   - 跳过 H1 标签（"Accessibility Links"）
+   - 提取前 3-5 个搜索结果的标题和摘要
+4. ✅ **缓存清理**: 修改专注主题时自动清理缓存
+5. ✅ **日志增强**: 添加 Content Snippet 预览到日志
+6. ✅ **文档清理**: 删除 19 个过时文档和 7 个临时测试脚本
 
-### 待测试功能
-- [ ] 工具链关键词检测是否正常工作
-- [ ] Vercel /docs 页面是否不再被 Fast Block
-- [ ] 内容提取是否准确排除干扰内容
+#### 最近提交记录
+- `3666d08` - 修复 Google 搜索结果页 (SERP) 内容提取
+- `8a4e012` - 添加工具链关键词检测并清理过时文档
+- `4214d3d` - 优化 Hybrid Reasoning 阈值和 Prompt V3.3
+
+### 测试状态
+- ✅ 工具链关键词检测：已实现并测试
+- ✅ Google SERP 内容提取：已实现
+- ✅ 内容提取优化：已实现（排除干扰内容）
+- ⏳ 生产环境验证：等待部署后验证
 
 ### 已知问题
 - 无
@@ -257,20 +258,22 @@ real-focus/
 
 ## 📝 下一步计划
 
-1. **测试验证**: 完成本地测试，验证工具链关键词检测
-2. **代码提交**: 提交并推送到 GitHub
-3. **生产部署**: 等待 Vercel 自动部署
-4. **文档清理**: 删除过时文档和测试脚本
-5. **功能优化**: 根据测试结果进一步优化
+1. **生产环境验证**: 验证部署后的功能是否正常工作
+2. **Google SERP 测试**: 在实际 Google 搜索结果页测试内容提取
+3. **性能优化**: 根据使用情况优化 API 调用频率
+4. **用户体验优化**: 根据用户反馈优化 UI 和交互
+5. **功能扩展**: 考虑添加更多搜索引擎支持（Bing, DuckDuckGo 等）
 
 ---
 
 ## 📚 相关文档
 
+- [前端开发进度](./FRONTEND_STATUS.md) - 前端 UI 实现和开发进度
 - [本地测试检查清单](./LOCAL_TEST_CHECKLIST.md)
 - [工具链关键词修复](./TOOLCHAIN_KEYWORD_FIX.md)
 - [混合判断阈值更新](./HYBRID_REASONING_THRESHOLD_UPDATE.md)
 - [时间控制功能](./TIME_CONTROL_FEATURE.md)
+- [Google SERP 修复](./GOOGLE_SERP_FIX.md)
 
 ---
 
