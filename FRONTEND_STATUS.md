@@ -380,7 +380,7 @@ function forceBlockPage(reason, score)
 4. **浏览器兼容**: 仅支持 Chrome/Edge (Manifest V3)
 5. **Pomodoro 计时器**: 使用测试时长（10秒/5秒），生产环境需要调整为标准时长（25分钟/5分钟/15分钟）
 
-### 最新更新 (2025-11-XX)
+### 最新更新 (2025-11-08)
 
 #### SVG 倒计时进度条实现
 - ✅ 实现了基于 SVG `stroke-dasharray` 和 `stroke-dashoffset` 的圆形进度条
