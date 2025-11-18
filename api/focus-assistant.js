@@ -174,6 +174,66 @@ export default async function handler(req, res) {
     }
 
     // ============================================
+    // Login/Authentication Page Detection (Whitelist)
+    // ============================================
+    // These pages are essential for user workflow and should never be blocked
+    // Check URL, title, and content for login/authentication indicators
+    
+    // Common login/authentication domain patterns
+    const loginDomainPatterns = [
+      'accounts.google.com',
+      'signin.google.com',
+      'login.microsoftonline.com',
+      'login.live.com',
+      'github.com/login',
+      'github.com/auth',
+      'oauth',
+      'sso',
+      'auth.'
+    ];
+    
+    // Keywords that indicate login/authentication pages
+    const loginKeywords = [
+      'login', 'signin', 'sign-in', 'log-in', 'sign_in', 'log_in',
+      'auth', 'authentication', 'authenticate', 'signup', 'sign-up', 'sign_up',
+      'account', 'credential', 'password', 'oauth', 'sso', 'single sign-on',
+      'student account', 'student login', 'google account', 'google login',
+      'microsoft account', 'microsoft login', 'github login', 'github auth'
+    ];
+    
+    const urlLower = url.toLowerCase();
+    const titleLower = title.toLowerCase();
+    const contentLower = (content_snippet || '').toLowerCase();
+    
+    // Check domain patterns first (most reliable)
+    const matchesLoginDomain = loginDomainPatterns.some(pattern => {
+      return urlLower.includes(pattern);
+    });
+    
+    // Check keywords in URL, title, or content
+    const matchesLoginKeyword = loginKeywords.some(keyword => {
+      return urlLower.includes(keyword) || 
+             titleLower.includes(keyword) || 
+             contentLower.includes(keyword);
+    });
+    
+    const isLoginPage = matchesLoginDomain || matchesLoginKeyword;
+    
+    if (isLoginPage) {
+      console.log(`🔓 Login/Authentication page detected: ${url}`);
+      console.log(`   Title: ${title}`);
+      console.log(`   Whitelisting: This page is essential for user workflow, allowing access`);
+      
+      // Return early: skip all blocking logic, always allow
+      return res.status(200).json({
+        relevance_score_percent: 85,
+        status: 'Stay',
+        reason: 'This is an authentication/login page required for accessing resources. Essential for workflow.',
+        requires_time_control: false
+      });
+    }
+
+    // ============================================
     // Helper Functions: Embedding & Similarity
     // ============================================
 

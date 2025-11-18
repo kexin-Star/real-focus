@@ -1393,7 +1393,70 @@ function startTimeControl(tabId, url, aiResult) {
  * @param {string} url - Current URL
  * @param {Object} aiResult - AI API result
  */
+/**
+ * Check if a URL is a login/authentication page
+ * @param {string} url - Page URL
+ * @param {string} title - Page title (optional)
+ * @returns {boolean} - True if it's a login page
+ */
+function isLoginPage(url, title = '') {
+  // Common login/authentication domain patterns
+  const loginDomainPatterns = [
+    'accounts.google.com',
+    'signin.google.com',
+    'login.microsoftonline.com',
+    'login.live.com',
+    'github.com/login',
+    'github.com/auth',
+    'oauth',
+    'sso',
+    'auth.'
+  ];
+  
+  // Keywords that indicate login/authentication pages
+  const loginKeywords = [
+    'login', 'signin', 'sign-in', 'log-in', 'sign_in', 'log_in',
+    'auth', 'authentication', 'authenticate', 'signup', 'sign-up', 'sign_up',
+    'account', 'credential', 'password', 'oauth', 'sso', 'single sign-on',
+    'student account', 'student login', 'google account', 'google login',
+    'microsoft account', 'microsoft login', 'github login', 'github auth'
+  ];
+  
+  const urlLower = url.toLowerCase();
+  const titleLower = title.toLowerCase();
+  
+  // Check domain patterns first (most reliable)
+  const matchesLoginDomain = loginDomainPatterns.some(pattern => {
+    return urlLower.includes(pattern);
+  });
+  
+  // Check keywords in URL or title
+  const matchesLoginKeyword = loginKeywords.some(keyword => {
+    return urlLower.includes(keyword) || titleLower.includes(keyword);
+  });
+  
+  return matchesLoginDomain || matchesLoginKeyword;
+}
+
 async function handleAPIResponse(tabId, url, aiResult) {
+  // Double-check: Never block login/authentication pages (safety net)
+  // This is a backup check in case the API didn't catch it
+  if (aiResult.status === 'Block') {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab && isLoginPage(url, tab.title || '')) {
+        console.log(`🔓 Login page detected in handleAPIResponse: ${url}`);
+        console.log(`   Overriding Block status to Stay (login pages should never be blocked)`);
+        // Override the block status
+        aiResult.status = 'Stay';
+        aiResult.relevance_score_percent = 85;
+        aiResult.reason = 'This is an authentication/login page required for accessing resources. Essential for workflow.';
+      }
+    } catch (error) {
+      console.warn('Could not check tab for login page:', error);
+    }
+  }
+  
   // Check if time control is required
   if (aiResult.requires_time_control === true) {
     console.log('Time control required for:', url);
