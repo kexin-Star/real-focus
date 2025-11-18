@@ -26,7 +26,7 @@
         class="keyword-input" 
         placeholder="e.g. using figma to design a prototype"
       >
-      <p class="hint-text">p.s. The more details you tell, the more powerful focus assistant.</p>
+      <p class="hint-text">P.S. The more adequate the details, the more precise the Focus Assistant's judgment.</p>
       <button id="startButton" class="start-button">Start Focus</button>
     </div>
   </div>
@@ -63,8 +63,8 @@
       <div class="main-content-grid">
         <!-- Left Column: Pomodoro Timer -->
         <div class="content-block timer-block">
-          <!-- Status Title -->
-          <div id="timerStatusTitle" class="timer-status-title">Focusing</div>
+          <!-- Status Title
+          <div id="timerStatusTitle" class="timer-status-title">Focusing</div> -->
           
           <!-- Large Countdown Display -->
           <div class="countdown-section-large">
@@ -101,29 +101,46 @@
                   transform="rotate(-90 50 50)"
                 />
               </svg>
-              <span class="countdown-text">25:00</span>
+              <!-- Countdown text (shown when timer is running) -->
+              <span id="countdownText" class="countdown-text">25:00</span>
+              <!-- Duration picker (shown when stopped/paused, clickable to change duration) -->
+              <div id="durationPickerContainer" class="duration-picker-container-inline hidden">
+                <div class="duration-picker-wrapper-inline">
+                  <div class="duration-picker-mask-inline"></div>
+                  <div id="durationPicker" class="duration-picker-inline">
+                    <div class="duration-option" data-minutes="5">05:00</div>
+                    <div class="duration-option" data-minutes="15">15:00</div>
+                    <div class="duration-option" data-minutes="25">25:00</div>
+                    <div class="duration-option" data-minutes="30">30:00</div>
+                    <div class="duration-option" data-minutes="45">45:00</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Action Buttons (FOCUS session) -->
-          <div id="focusActions" class="action-buttons">
-            <button id="pauseFocusButton" class="action-button action-button-filled">Pause</button>
-          </div>
-          
-          <!-- Action Buttons (BREAK session) -->
-          <div id="breakActions" class="action-buttons hidden">
-            <button id="doneBreakButton" class="action-button action-button-filled">Done</button>
-          </div>
-          
-          <!-- Action Buttons (STOPPED state) -->
-          <div id="stoppedActions" class="action-buttons hidden">
-            <button id="startToFocusButton" class="action-button action-button-filled">Start to Focus</button>
-          </div>
-          
-          <!-- Action Buttons (PAUSED state) -->
-          <div id="pausedActions" class="action-buttons hidden">
-            <button id="resumeFocusButton" class="action-button action-button-filled">Continue</button>
-            <button id="stopFocusButton" class="action-button action-button-outlined">Stop</button>
+          <!-- Action Buttons Wrapper -->
+          <div class="timer-actions-wrapper">
+            <!-- Action Buttons (FOCUS session) -->
+            <div id="focusActions" class="action-buttons">
+              <button id="pauseFocusButton" class="action-button action-button-filled">Pause</button>
+            </div>
+            
+            <!-- Action Buttons (BREAK session) -->
+            <div id="breakActions" class="action-buttons hidden">
+              <button id="doneBreakButton" class="action-button action-button-filled">Done</button>
+            </div>
+            
+            <!-- Action Buttons (STOPPED state) -->
+            <div id="stoppedActions" class="action-buttons hidden">
+              <button id="startToFocusButton" class="action-button action-button-filled">Start to Focus</button>
+            </div>
+            
+            <!-- Action Buttons (PAUSED state) -->
+            <div id="pausedActions" class="action-buttons hidden">
+              <button id="resumeFocusButton" class="action-button action-button-filled">Continue</button>
+              <button id="stopFocusButton" class="action-button action-button-outlined">Stop</button>
+            </div>
           </div>
         </div>
 
@@ -166,6 +183,12 @@
   </div>
 
 
+  <!-- Module scripts (load in order) -->
+  <script src="time-utils.js"></script>
+  <script src="storage-utils.js"></script>
+  <script src="ui-manager.js"></script>
+  <script src="event-handlers.js"></script>
+  <!-- Main entry point -->
   <script src="popup.js"></script>
 </body>
 </html>

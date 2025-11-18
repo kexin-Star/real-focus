@@ -1,15 +1,38 @@
-# AI Focus Assistant - Vercel Serverless Function
+# Real Focus Assistant
 
-这是一个用于 Vercel 的 Serverless Function 骨架项目。
+一个 AI 驱动的 Chrome 扩展，帮助用户在浏览网页时保持专注。使用 OpenAI Embeddings 和 GPT-4o-mini 智能分析网页与用户任务的相关性，自动拦截不相关的干扰内容。
+
+## 核心功能
+
+- 🎯 **智能相关性判断**: 使用 OpenAI Embeddings 和 GPT-4o-mini 进行语义分析和深度推理
+- ⚡ **混合判断策略**: Fast Pass / Fast Block / Slow Think (GPT) 三层逻辑，平衡性能和准确性
+- ⏰ **时间控制**: 在干扰平台上搜索工作内容时，提供 30 秒宽限期
+- 🔧 **工具链识别**: 自动识别开发工具和文档页面，避免误伤
+- 📦 **缓存机制**: 24 小时缓存，减少 API 调用成本
+- 🎨 **Material Design 3 UI**: 现代化的用户界面设计
 
 ## 项目结构
 
 ```
 real-focus/
 ├── api/
-│   └── focus-assistant.js    # Vercel Serverless Function
-├── package.json               # 项目依赖
-└── README.md                  # 项目说明
+│   └── focus-assistant.js    # Vercel Serverless Function (762 行)
+├── extension/                 # Chrome Extension
+│   ├── background.js         # Service Worker (1,535 行)
+│   ├── content.js            # Content Script (923 行)
+│   ├── popup.js              # Popup 主入口 (787 行)
+│   ├── ui-manager.js         # UI 管理模块 (657 行)
+│   ├── event-handlers.js     # 事件处理模块 (417 行)
+│   ├── storage-utils.js      # 存储工具模块 (94 行)
+│   ├── time-utils.js         # 时间工具模块 (77 行)
+│   ├── popup.html            # Popup HTML (195 行)
+│   ├── popup.css             # Popup 样式 (842 行)
+│   └── manifest.json         # Extension 配置
+├── test-hybrid-strategy.js   # 交互式测试工具
+├── test-openai-key.js        # API Key 测试工具
+├── local-server.js           # 本地测试服务器
+├── package.json              # 项目依赖
+└── vercel.json               # Vercel 配置
 ```
 
 ## 安装依赖
@@ -66,6 +89,50 @@ OPENAI_API_KEY=sk-your-api-key-here
 
 **注意：** `.env.local` 文件已添加到 `.gitignore`，不会被提交到 Git。
 
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+npm install
+```
+
+### 2. 配置环境变量
+
+创建 `.env.local` 文件：
+
+```env
+OPENAI_API_KEY=sk-your-api-key-here
+```
+
+### 3. 本地开发
+
+启动本地服务器：
+
+```bash
+npm run local
+# 或
+node local-server.js
+```
+
+### 4. 加载 Chrome Extension
+
+1. 打开 Chrome 浏览器
+2. 访问 `chrome://extensions/`
+3. 开启"开发者模式"
+4. 点击"加载已解压的扩展程序"
+5. 选择项目的 `extension/` 文件夹
+
+### 5. 测试
+
+运行交互式测试：
+
+```bash
+npm test
+# 或
+npm run test:local  # 使用本地 API
+```
+
 ## API 端点
 
 ### POST `/api/focus-assistant`
@@ -73,21 +140,20 @@ OPENAI_API_KEY=sk-your-api-key-here
 **请求体：**
 ```json
 {
-  "keywords": "关键词1, 关键词2",
+  "keywords": "用户专注主题",
   "title": "页面标题",
-  "url": "https://example.com"
+  "url": "https://example.com",
+  "content_snippet": "页面内容摘要（可选）"
 }
 ```
 
 **响应：**
 ```json
 {
-  "status": "received",
-  "data": {
-    "keywords": "关键词1, 关键词2",
-    "title": "页面标题",
-    "url": "https://example.com"
-  }
+  "relevance_score_percent": 85,
+  "status": "Stay",
+  "reason": "This page is relevant to your focus topic",
+  "requires_time_control": false
 }
 ```
 

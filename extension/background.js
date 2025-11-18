@@ -5,7 +5,7 @@
 // ============================================
 // ⚠️ Set to true for UI testing (zero API cost)
 // ⚠️ Set to false for production (use real API)
-const IS_MOCKING_ENABLED = true; // Change to true to enable mocking
+const IS_MOCKING_ENABLED = false; // Change to true to enable mocking
 
 const CACHE_KEY = 'aiCache';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -14,10 +14,9 @@ const MAX_CACHE_SIZE = 4 * 1024 * 1024; // 4MB (leave 1MB buffer from 5MB limit)
 // ============================================
 // Pomodoro Timer Constants
 // ============================================
-// Test durations (for testing purposes)
-const POMODORO_FOCUS_DURATION = 10 * 1000; // 10 seconds in milliseconds (was 25 minutes)
-const POMODORO_SHORT_BREAK = 5 * 1000; // 5 seconds in milliseconds (was 5 minutes)
-const POMODORO_LONG_BREAK = 10 * 1000; // 10 seconds in milliseconds (was 15 minutes)
+const POMODORO_FOCUS_DURATION = 25 * 60 * 1000; // 25 minutes in milliseconds
+const POMODORO_SHORT_BREAK = 5 * 60 * 1000; // 5 minutes in milliseconds
+const POMODORO_LONG_BREAK = 15 * 60 * 1000; // 15 minutes in milliseconds
 const POMODORO_STATE_KEY = 'pomodoroState'; // Chrome Storage key for pomodoro state
 const STATISTICS_KEY = 'focusStatistics'; // Chrome Storage key for statistics (separate from pomodoro state)
 
@@ -60,15 +59,18 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 /**
- * Get cached AI result for a URL
+ * Get cached AI result for a URL and keywords combination
  * @param {string} url - The page URL
+ * @param {string} keywords - The focus keywords
  * @returns {Promise<Object|null>} - Cached result or null if not found/expired
  */
-async function getCache(url) {
+async function getCache(url, keywords) {
   try {
     const result = await chrome.storage.local.get([CACHE_KEY]);
     const cache = result[CACHE_KEY] || {};
-    const cachedData = cache[url];
+    // Cache key includes both URL and keywords to ensure different keywords get different results
+    const cacheKey = `${url}|${keywords}`;
+    const cachedData = cache[cacheKey];
     
     if (!cachedData) {
       return null;
@@ -80,7 +82,7 @@ async function getCache(url) {
     
     if (age > CACHE_TTL) {
       // Cache expired, remove it
-      delete cache[url];
+      delete cache[cacheKey];
       await chrome.storage.local.set({ [CACHE_KEY]: cache });
       return null;
     }
@@ -98,11 +100,12 @@ async function getCache(url) {
 }
 
 /**
- * Set cache for a URL
+ * Set cache for a URL and keywords combination
  * @param {string} url - The page URL
+ * @param {string} keywords - The focus keywords
  * @param {Object} result - AI result object
  */
-async function setCache(url, result) {
+async function setCache(url, keywords, result) {
   try {
     const result_data = await chrome.storage.local.get([CACHE_KEY]);
     let cache = result_data[CACHE_KEY] || {};
@@ -118,11 +121,13 @@ async function setCache(url, result) {
     // Check storage size before adding
     await ensureCacheCapacity(cache, cacheEntry);
     
+    // Cache key includes both URL and keywords to ensure different keywords get different results
+    const cacheKey = `${url}|${keywords}`;
     // Add new entry
-    cache[url] = cacheEntry;
+    cache[cacheKey] = cacheEntry;
     
     await chrome.storage.local.set({ [CACHE_KEY]: cache });
-    console.log('Cache updated for:', url);
+    console.log('Cache updated for:', url, 'with keywords:', keywords);
   } catch (error) {
     console.error('Error setting cache:', error);
     // If storage is full, try to clean up and retry
@@ -131,7 +136,8 @@ async function setCache(url, result) {
       try {
         const result_data = await chrome.storage.local.get([CACHE_KEY]);
         let cache = result_data[CACHE_KEY] || {};
-        cache[url] = {
+        const cacheKey = `${url}|${keywords}`;
+        cache[cacheKey] = {
           score: result.relevance_score_percent,
           status: result.status,
           reason: result.reason || '',
@@ -315,6 +321,8 @@ async function callAIAPI(keywords, title, url, extractedContent = null) {
   }
   
   // Use the latest deployed API URL
+  // For local testing: uncomment the line below and comment out the production URL
+  // const apiUrl = 'http://localhost:3000/api/focus-assistant';
   const apiUrl = 'https://real-focus-32cpqcsg8-kexins-projects-f8f51bd8.vercel.app/api/focus-assistant';
   
   // Use extracted content if available, otherwise fallback to title
@@ -328,24 +336,35 @@ async function callAIAPI(keywords, title, url, extractedContent = null) {
     contentSnippet = extractedContent.content_snippet || '';
   }
   
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      keywords,
-      title: contentTitle, // Use original title (API will handle content_snippet separately)
-      url,
-      content_snippet: contentSnippet // Pass content_snippet separately for V5.0 prompt
-    })
-  });
-  
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        keywords,
+        title: contentTitle, // Use original title (API will handle content_snippet separately)
+        url,
+        content_snippet: contentSnippet // Pass content_snippet separately for V5.0 prompt
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    // Enhanced error handling for network issues
+    if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+      console.error('❌ Network error calling API:', apiUrl);
+      console.error('   Error details:', error.message);
+      console.error('   Make sure the API server is running or use production URL');
+      throw new Error(`Failed to connect to API server. Please check if the server is running at ${apiUrl}`);
+    }
+    throw error;
   }
-  
-  return await response.json();
 }
 
 // Listen for messages from content scripts or popup
@@ -362,7 +381,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         
         // First, check cache
-        const cachedResult = await getCache(url);
+        const cachedResult = await getCache(url, keywords);
         if (cachedResult) {
           console.log('Cache hit for:', url);
           sendResponse({ success: true, data: cachedResult });
@@ -421,7 +440,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Store in cache (but don't cache time control flag)
         const cacheResult = { ...aiResult };
         delete cacheResult.requires_time_control; // Don't cache this flag
-        await setCache(url, cacheResult);
+        await setCache(url, keywords, cacheResult);
         
         // Return result
         sendResponse({ 
@@ -502,13 +521,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         
         // Check cache first
-        const cachedResult = await getCache(url);
+        const cachedResult = await getCache(url, keywords);
         let relevanceData = null;
         
         if (cachedResult) {
           // Use cached result
           relevanceData = cachedResult;
-          console.log('Using cached result for popup state:', url);
+          console.log('Using cached result for popup state:', url, 'with keywords:', keywords);
         } else {
           // Extract content and call API (or mock)
           const extractedContent = await extractContentFromTab(tabId);
@@ -526,7 +545,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           // Cache the result (but don't cache time control flag)
           const cacheResult = { ...relevanceData };
           delete cacheResult.requires_time_control;
-          await setCache(url, cacheResult);
+          await setCache(url, keywords, cacheResult);
           
           // Handle API response (trigger UI actions in content script)
           await handleAPIResponse(tabId, url, relevanceData);
@@ -707,14 +726,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'init_focus') {
     (async () => {
       try {
-        const { keywords } = request;
+        const { keywords, focusDuration } = request;
         if (!keywords) {
           sendResponse({ success: false, error: 'Keywords required' });
           return;
         }
         
+        // Use custom duration if provided, otherwise use default
+        const duration = focusDuration || POMODORO_FOCUS_DURATION;
+        
         // Initialize new pomodoro state
-        const initialState = await initializePomodoroState(keywords);
+        const initialState = await initializePomodoroState(keywords, duration);
         sendResponse({ success: true, pomodoroState: initialState });
       } catch (error) {
         console.error('Error initializing focus:', error);
@@ -739,8 +761,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           } else {
             state.current_cycle += 1; // Increment for next focus session
           }
+          
+          // Get saved focus duration or use default
+          const savedDuration = await chrome.storage.local.get(['focusDuration']);
+          const focusDuration = savedDuration.focusDuration 
+            ? savedDuration.focusDuration * 60 * 1000 
+            : POMODORO_FOCUS_DURATION;
+          
           state.start_time = now;
-          state.target_end_time = now + POMODORO_FOCUS_DURATION;
+          state.target_end_time = now + focusDuration;
+          state.original_duration = focusDuration; // Save original duration for accurate progress calculation
           await setPomodoroState(state);
           
           // Set up alarm for focus end
@@ -776,8 +806,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           });
           
           state.status = 'PAUSED';
-          // 记录剩余时间
+          // 记录剩余时间（不更新 target_end_time，保持原值）
+          // 这样在计算剩余时间时，如果状态是 PAUSED，应该使用 time_left_ms
           state.time_left_ms = state.target_end_time - now;
+          
+          // 保存原始总时长，用于 resume 后正确计算进度
+          if (!state.original_duration) {
+            state.original_duration = state.target_end_time - state.start_time;
+          }
+          
+          // 不更新 target_end_time，保持原值
+          // 在计算剩余时间时，如果状态是 PAUSED，使用 time_left_ms 而不是 target_end_time - now
           
           // Clear alarm when paused
           clearPomodoroAlarm();
@@ -811,6 +850,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           // 根据剩余时间重新计算目标结束时间
           state.start_time = now; 
           state.target_end_time = now + state.time_left_ms;
+          
+          // 保持 original_duration，用于正确计算进度
+          // original_duration 已经在 pause 时保存，不需要重新计算
+          
           delete state.time_left_ms; // 清除剩余时间变量
           
           // Set up alarm for resumed session
@@ -858,6 +901,46 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     return true; 
+  }
+  
+  // ============================================
+  // Update keywords in pomodoro state
+  // ============================================
+  if (request.action === 'update_keywords') {
+    (async () => {
+      try {
+        const { keywords } = request;
+        if (!keywords) {
+          sendResponse({ success: false, error: 'Keywords required' });
+          return;
+        }
+        
+        const state = await getPomodoroState();
+        if (state) {
+          // Update keywords in existing pomodoro state
+          state.keywords = keywords;
+          await setPomodoroState(state);
+          console.log('✅ Keywords updated in pomodoro state:', keywords);
+        }
+        
+        // Clear cache when keywords change to ensure AI uses new subject
+        // This ensures relevance checks use the updated keywords
+        await new Promise((resolve) => {
+          chrome.storage.local.set({ [CACHE_KEY]: {} }, () => {
+            console.log('✅ Cache cleared after keywords update');
+            // Clear all UI elements from all tabs
+            clearAllTabUIs();
+            resolve();
+          });
+        });
+        
+        sendResponse({ success: true, pomodoroState: state || null });
+      } catch (error) {
+        console.error('Error updating keywords:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
   }
   
   return false;
@@ -925,35 +1008,76 @@ async function setPomodoroState(newState) {
 }
 
 /**
+ * Get local date string in YYYY-MM-DD format based on user's local timezone
+ * @returns {string} - Date string in YYYY-MM-DD format
+ */
+function getLocalDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Get statistics from Chrome Storage
+ * Automatically resets if the date has changed (based on user's local timezone)
  * @returns {Promise<Object>} - Statistics object with total_focused_time and blocked_count
  */
 async function getStatistics() {
   try {
     const result = await chrome.storage.local.get([STATISTICS_KEY]);
+    const currentDate = getLocalDateString();
     const stats = result[STATISTICS_KEY] || {
       total_focused_time: 0,
-      blocked_count: 0
+      blocked_count: 0,
+      last_reset_date: currentDate
     };
+    
+    // Check if date has changed (crossed midnight in user's local timezone)
+    if (stats.last_reset_date !== currentDate) {
+      console.log(`Date changed from ${stats.last_reset_date} to ${currentDate}. Resetting daily statistics.`);
+      // Reset statistics for the new day
+      const resetStats = {
+        total_focused_time: 0,
+        blocked_count: 0,
+        last_reset_date: currentDate
+      };
+      await chrome.storage.local.set({ [STATISTICS_KEY]: resetStats });
+      return resetStats;
+    }
+    
+    // Ensure last_reset_date exists (for backward compatibility)
+    if (!stats.last_reset_date) {
+      stats.last_reset_date = currentDate;
+      await chrome.storage.local.set({ [STATISTICS_KEY]: stats });
+    }
+    
     return stats;
   } catch (error) {
     console.error('Error getting statistics:', error);
-    return { total_focused_time: 0, blocked_count: 0 };
+    return { total_focused_time: 0, blocked_count: 0, last_reset_date: getLocalDateString() };
   }
 }
 
 /**
  * Update statistics in Chrome Storage
+ * Automatically resets if the date has changed (based on user's local timezone)
  * @param {Object} stats - Statistics object with total_focused_time and/or blocked_count
  * @returns {Promise<boolean>} - Success status
  */
 async function updateStatistics(stats) {
   try {
+    // getStatistics() will automatically reset if date changed
     const currentStats = await getStatistics();
+    const currentDate = getLocalDateString();
+    
     const updatedStats = {
       total_focused_time: stats.total_focused_time !== undefined ? stats.total_focused_time : currentStats.total_focused_time,
-      blocked_count: stats.blocked_count !== undefined ? stats.blocked_count : currentStats.blocked_count
+      blocked_count: stats.blocked_count !== undefined ? stats.blocked_count : currentStats.blocked_count,
+      last_reset_date: currentDate // Always update the reset date
     };
+    
     await chrome.storage.local.set({ [STATISTICS_KEY]: updatedStats });
     console.log('Statistics updated:', updatedStats);
     return true;
@@ -982,10 +1106,12 @@ async function clearPomodoroState() {
 /**
  * Initialize pomodoro state for a new focus session
  * @param {string} keywords - Focus topic/keywords
+ * @param {number} [duration] - Focus duration in milliseconds (optional, defaults to POMODORO_FOCUS_DURATION)
  * @returns {Promise<Object>} - Initialized pomodoro state
  */
-async function initializePomodoroState(keywords) {
+async function initializePomodoroState(keywords, duration = null) {
   const now = Date.now();
+  const focusDuration = duration || POMODORO_FOCUS_DURATION;
   const initialState = {
     keywords: keywords,
     status: 'FOCUS', // Starting with a focus session
@@ -993,7 +1119,8 @@ async function initializePomodoroState(keywords) {
     cycle_count: 0, // Number of completed focus cycles
     current_cycle: 0, // Current cycle in sequence (0-4)
     start_time: now,
-    target_end_time: now + POMODORO_FOCUS_DURATION, // 25 minutes from now
+    target_end_time: now + focusDuration,
+    original_duration: focusDuration, // Save original duration for accurate progress calculation after pause/resume
     is_task_completed: false // Task not completed yet
   };
   
@@ -1046,7 +1173,7 @@ async function handleEndFocus() {
     state.current_cycle = nextCycle;
     state.start_time = now;
     state.target_end_time = now + breakDuration;
-    
+    state.original_duration = breakDuration; // Save original duration for accurate progress calculation
     await setPomodoroState(state);
     
     // Set up alarm for break end
@@ -1101,7 +1228,7 @@ async function handleEndBreak() {
     
     state.start_time = now;
     state.target_end_time = now + POMODORO_FOCUS_DURATION;
-    
+    state.original_duration = POMODORO_FOCUS_DURATION; // Save original duration for accurate progress calculation
     await setPomodoroState(state);
     
     // Set up alarm for focus end
@@ -1339,9 +1466,9 @@ async function checkCurrentTabRelevance(tabId, url) {
     console.log('Checking relevance for tab:', tabId, 'URL:', url);
     
     // First, check cache
-    const cachedResult = await getCache(url);
+    const cachedResult = await getCache(url, keywords);
     if (cachedResult) {
-      console.log('Cache hit for:', url);
+      console.log('Cache hit for:', url, 'with keywords:', keywords);
       // Handle cached result (but don't trigger UI for cached results)
       // UI will be triggered on fresh API calls only
       return cachedResult;
@@ -1396,7 +1523,7 @@ async function checkCurrentTabRelevance(tabId, url) {
     // Store in cache (but don't cache time control flag)
     const cacheResult = { ...aiResult };
     delete cacheResult.requires_time_control; // Don't cache this flag
-    await setCache(url, cacheResult);
+    await setCache(url, keywords, cacheResult);
     
     return aiResult;
   } catch (error) {

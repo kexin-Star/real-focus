@@ -263,6 +263,8 @@ Evaluate how directly the following webpage supports the user's current task bas
 [Context]
 The <SEMANTIC_SIMILARITY_SCORE> (0-100) is calculated using Embedding similarity between the task keywords and webpage content. This score indicates the initial semantic similarity, but may not capture domain-specific relevance, content quality, task alignment, or process-related necessities.
 
+**IMPORTANT**: When <WEBPAGE_URL> is a search results page (e.g., google.com/search, bing.com/search), you must focus on the <WEBPAGE_CONTENT> and the tool chain domains that the search results point to, rather than treating the search results page itself as low-value interference. Search results pages that contain links to tool chain documentation should be evaluated based on the documentation value of those results.
+
 [Reasoning and Output Logic]
 
 1. **Content Analysis:**
@@ -272,25 +274,36 @@ The <SEMANTIC_SIMILARITY_SCORE> (0-100) is calculated using Embedding similarity
    - Check task alignment (does this directly support the user's productivity goal?).
 
 2. **Process Common Sense Reasoning (Critical):**
-   - **Judge whether the current page content belongs to essential supporting tools, API management, official documentation, or other administrative/management processes required to complete the user's task.**
+   - **Goal**: Judge whether the current page content belongs to essential supporting tools, API management, official documentation, or other administrative/management processes required to complete the user's task.
    - **If the page is a necessary supporting resource (e.g., API usage pages, documentation portals, account management, billing pages for tools being used), even if the semantic score is relatively low, you should provide a higher corrected score.**
+   - **CRITICAL CONSTRAINT for Search Engine Results Pages (SERP):**
+     * **If the page is a Search Engine Results Page (SERP) from mainstream search engines (e.g., google.com/search, bing.com/search):**
+       - **ONLY** assign 50-69% process value score if the <WEBPAGE_CONTENT> shows reasonable semantic relevance to <TASK_KEYWORDS> (i.e., the initial <SEMANTIC_SIMILARITY_SCORE> is above 35-40%).
+       - **If the content is clearly irrelevant** (e.g., searching for "Starbucks" when the task is about "AI"), you should assign a low score (15-30%) based on the actual content relevance, NOT the process value.
+       - **Rationale**: Not all search results are relevant. Only search results that actually relate to the task should receive process value scores. Irrelevant searches (e.g., searching for coffee shops when working on AI) should be blocked.
+     * **For SERP pages, Process Common Sense Reasoning takes priority over Documentation Value Rule.** Even if the content mentions tools, first check if the search results are semantically relevant to the task keywords using the initial semantic score.
    - Examples of process-necessary pages:
      * API usage/billing pages for tools mentioned in task keywords
      * Official documentation for frameworks/libraries being used
      * Account management or authentication pages for required services
      * Development environment setup or configuration pages
      * Version control or project management tools related to the task
+     * Search results pages (SERP) with relevant content (semantic score > 35-40%) that help users find resources for learning/research tasks
    
    **3. Documentation Value Rule (MANDATORY - HIGHEST PRIORITY):**
-   - **STEP 1: Check if URL or Title contains documentation keywords**: Look for 'docs', 'documentation', 'errors', 'error', 'api', 'reference', 'guide', 'tutorial', 'getting-started', 'quickstart', 'examples', 'example', 'how-to', 'howto', 'faq', 'help', 'support', 'manual', 'handbook', 'playbook', 'cheatsheet', 'cheat-sheet', 'reference', 'spec', 'specification'.
-   - **STEP 2: Check if domain is a development tool chain**: Check if the domain (from <WEBPAGE_URL>) belongs to: vercel.com, github.com, gitlab.com, npmjs.com, stackoverflow.com, gemini.google.com, chat.openai.com, claude.ai, openai.com, anthropic.com, developer.mozilla.org, nodejs.org, react.dev, vuejs.org, angular.io, nextjs.org, nuxt.com, or their subdomains (e.g., docs.vercel.com, docs.github.com).
-   - **STEP 3: If BOTH conditions are met**: This page is **essential technical support** for completing the task. **YOU MUST assign a score between 70% and 90%**. Do NOT assign a score below 70% for these pages.
+   - **IMPORTANT**: This rule applies primarily to **direct tool chain domain pages**, NOT to search results pages (SERP). For SERP pages, Process Common Sense Reasoning (Rule 2) takes priority.
+   - **STEP 1: Check if URL, Title, or Content contains documentation keywords**: Look for 'docs', 'documentation', 'errors', 'error', 'api', 'reference', 'guide', 'tutorial', 'getting-started', 'quickstart', 'examples', 'example', 'how-to', 'howto', 'faq', 'help', 'support', 'manual', 'handbook', 'playbook', 'cheatsheet', 'cheat-sheet', 'reference', 'spec', 'specification'.
+   - **STEP 2: Check if domain is a development tool chain**: 
+     * **For regular pages**: Check if the domain (from <WEBPAGE_URL>) belongs to: vercel.com, github.com, gitlab.com, npmjs.com, stackoverflow.com, gemini.google.com, chat.openai.com, claude.ai, openai.com, anthropic.com, developer.mozilla.org, nodejs.org, react.dev, vuejs.org, angular.io, nextjs.org, nuxt.com, or their subdomains (e.g., docs.vercel.com, docs.github.com).
+     * **For search results pages (SERP)**: This rule should NOT be applied to SERP pages. SERP pages should be evaluated using Process Common Sense Reasoning (Rule 2) first, which checks semantic relevance before assigning process value scores.
+   - **STEP 3: If BOTH conditions are met (and page is NOT a SERP)**: This page is **essential technical support** for completing the task. **YOU MUST assign a score between 70% and 90%**. Do NOT assign a score below 70% for these pages.
    - **Rationale**: Documentation, error guides, API references, and tutorials from reputable development tool chains are critical resources for any development task, even if the semantic similarity is low. They provide necessary technical information that directly supports productivity.
    - **Examples that MUST score 70-90%**:
      * vercel.com/docs/errors/... → 70-90% (contains 'docs' and 'errors', domain is vercel.com)
      * github.com/docs/... → 70-90% (contains 'docs', domain is github.com)
      * developer.mozilla.org/en-US/docs/... → 70-90% (contains 'docs', domain is developer.mozilla.org)
      * nodejs.org/api/... → 70-90% (contains 'api', domain is nodejs.org)
+     * gemini.google.com/app/... → 70-90% (domain is gemini.google.com, tool chain domain)
    - **This rule takes precedence over semantic similarity score. Even if semantic score is 15%, if this rule applies, you MUST assign 70-90%.**
 
 4. **Correction Instruction:**
@@ -316,8 +329,12 @@ Output JSON only. You must provide:
 - "reason": Brief explanation of your judgment (<25 words, in the same language as TASK_KEYWORDS)
 
 **FINAL CHECK BEFORE OUTPUT**: 
-- If the page URL or title contains documentation keywords (docs, errors, api, reference, guide, etc.) AND the domain is a development tool chain (vercel.com, github.com, etc.), your score MUST be between 70-90.
-- Do NOT output a score below 70 for tool chain documentation pages, even if you think the content is not directly related to the task keywords.
+- **For direct tool chain domain pages** (NOT SERP): If the page URL, title, or content contains documentation keywords (docs, errors, api, reference, guide, etc.) AND the domain is a development tool chain, your score MUST be between 70-90.
+- **For search results pages (SERP)**: 
+  * First, check Process Common Sense Reasoning (Rule 2): Only assign 50-69% if the initial semantic score is above 35-40% and content is relevant to task keywords.
+  * If semantic score is low (< 35-40%) or content is irrelevant, assign low score (15-30%) based on actual content relevance.
+  * Do NOT automatically apply Documentation Value Rule to SERP pages - Process Reasoning takes priority.
+- Do NOT output a score below 70 for direct tool chain documentation pages (non-SERP), even if you think the content is not directly related to the task keywords.
 
 {
   "relevance_score_percent": [integer 0–100],
@@ -544,42 +561,55 @@ Output JSON only. You must provide:
       'nuxt.com'
     ];
 
-    // Check if current domain is a tool chain domain
-    const isToolChainDomain = extractedDomain && TOOL_CHAIN_DOMAINS.some(toolDomain => {
+    // 1. Check if this is an explicit tool chain domain (e.g., vercel.com, gemini.google.com)
+    // These are direct tool chain/documentation pages, not search results
+    const isExplicitToolChain = extractedDomain && TOOL_CHAIN_DOMAINS.some(toolDomain => {
       const matches = extractedDomain === toolDomain || 
                       extractedDomain.endsWith('.' + toolDomain) ||
                       extractedDomain.includes(toolDomain);
       if (matches) {
-        console.log(`🔧 Tool chain domain matched: ${extractedDomain} matches ${toolDomain}`);
+        console.log(`🔧 Explicit tool chain domain matched: ${extractedDomain} matches ${toolDomain}`);
       }
       return matches;
     });
     
     if (extractedDomain) {
-      console.log(`🔍 Domain check: ${extractedDomain}, isToolChainDomain: ${isToolChainDomain}`);
+      console.log(`🔍 Domain check: ${extractedDomain}, isExplicitToolChain: ${isExplicitToolChain}`);
+    }
+
+    // 2. Check if this is a Google Search Results Page (SERP)
+    const isGoogleSERP = url.includes('google.com/search') || url.includes('google.com/search?') || 
+                         url.includes('bing.com/search') || url.includes('bing.com/search?');
+    if (isGoogleSERP) {
+      console.log(`🔍 Search Results Page (SERP) detected: ${url}`);
     }
 
     // ============================================
-    // Toolchain Keyword Detection (Before Fast Block)
+    // Score Force Upgrade Logic (Before Fast Block)
     // ============================================
-    // Check if URL/Title/Content contains toolchain keywords
-    // This ensures toolchain pages are not Fast Blocked even with low semantic scores
-    const combinedTextForToolchain = `${url} ${title} ${content_snippet || ''}`.toLowerCase();
-    const hasToolchainKeyword = toolchainKeywords.tools.some(k => combinedTextForToolchain.includes(k.toLowerCase())) ||
-                                toolchainKeywords.documentation.some(k => combinedTextForToolchain.includes(k.toLowerCase()));
+    // Only force upgrade to 40 if:
+    // Condition A: Page is an explicit tool chain/documentation page (regardless of score)
+    // Condition B: Page is a SERP AND initial semantic score is above low relevance threshold (> 15)
+    // 
+    // This ensures:
+    // - Explicit tool chain pages always go through GPT analysis
+    // - SERP pages with very low scores (<= 15) will be Fast Blocked
+    // - SERP pages with reasonable scores (> 15) will go through GPT analysis
     
-    // If toolchain keyword detected AND semantic score is low (<= 35), force score upgrade
-    // This ensures toolchain documentation pages go through GPT analysis instead of Fast Block
-    if (hasToolchainKeyword && semantic_score <= 35 && !isInterferenceDomain) {
-      console.log(`🔧 Toolchain keyword detected in URL/Title/Content`);
-      console.log(`   Original semantic score: ${semantic_score}, forcing to 40 to skip Fast Block`);
-      console.log(`   This ensures toolchain pages (e.g., Vercel /docs) go through GPT analysis`);
+    const shouldForceUpgrade = isExplicitToolChain || (isGoogleSERP && semantic_score > 15);
+    
+    if (shouldForceUpgrade && semantic_score < 40) {
+      // Avoid lowering the score if it's already above 40
+      if (isExplicitToolChain) {
+        console.log(`🔧 Explicit tool chain domain detected. Original semantic score: ${semantic_score}, forcing to 40 to skip Fast Block`);
+      } else if (isGoogleSERP) {
+        console.log(`🔍 SERP detected with semantic score ${semantic_score} (> 15). Forcing to 40 to skip Fast Block`);
+      }
       
-      // Force semantic score to 40 to skip Fast Block (which is <= 20)
-      // 40 is between 20 and 75, guaranteeing GPT path execution
       semantic_score = 40;
-      
       console.log(`   Semantic score updated to: ${semantic_score} (will trigger GPT deep analysis)`);
+    } else if (isGoogleSERP && semantic_score <= 15) {
+      console.log(`⚠️  SERP detected but semantic score (${semantic_score}) is too low (<= 15). Will NOT force upgrade - may be Fast Blocked.`);
     }
 
     // ============================================
@@ -599,10 +629,16 @@ Output JSON only. You must provide:
     // Tier 2: Low Relevance (Fast Block) - Skip GPT
     // ============================================
     // Updated: Fast Block threshold moved from <=35 to <=20
-    // Exception: Tool chain domains always go through GPT (even if score <= 20)
-    else if (semantic_score <= 20 && !isToolChainDomain) {
+    // Exception: Only explicit tool chain domains can skip Fast Block
+    // Note: SERP pages with low scores (<= 15) will be Fast Blocked
+    //       SERP pages with scores > 15 will have been upgraded to 40, so they won't reach here
+    if (semantic_score <= 20 && !isExplicitToolChain) {
       console.log(`Low relevance detected (score: ${semantic_score}), using fast block (no GPT)`);
-      console.log(`   Domain: ${extractedDomain} is NOT a tool chain domain, skipping GPT`);
+      if (isGoogleSERP) {
+        console.log(`   SERP page with low semantic score (${semantic_score} <= 15), treating as irrelevant search`);
+      } else {
+        console.log(`   Domain: ${extractedDomain} is NOT an explicit tool chain domain, skipping GPT`);
+      }
       
       // Use a low score in the range 10-20 (simplified to 15)
       final_score = 15;
@@ -615,12 +651,16 @@ Output JSON only. You must provide:
     // Tier 3: Ambiguous Relevance (Deep Analysis) - Use GPT
     // ============================================
     // Updated: GPT analysis range expanded from (35, 75) to (20, 75)
-    // Also includes tool chain domains even if score <= 20
+    // Also includes explicit tool chain domains even if original score <= 20 (they were upgraded to 40)
+    // Also includes SERP pages with scores > 15 (they were upgraded to 40)
     else {
       // Semantic score is between 20 and 75 (inclusive boundaries)
-      // OR it's a tool chain domain (even if score <= 20)
-      if (isToolChainDomain && semantic_score <= 20) {
-        console.log(`Tool chain domain detected (${extractedDomain}), forcing GPT analysis despite low score (${semantic_score})`);
+      // OR it's an explicit tool chain domain (original score <= 20, but upgraded to 40)
+      // OR it's a SERP with original score > 15 (upgraded to 40)
+      if (isExplicitToolChain) {
+        console.log(`Explicit tool chain domain detected (${extractedDomain}), using GPT analysis (score: ${semantic_score})`);
+      } else if (isGoogleSERP) {
+        console.log(`SERP detected with relevant content (score: ${semantic_score}), using GPT analysis`);
       } else {
         console.log(`Ambiguous relevance (score: ${semantic_score}), using GPT deep analysis`);
       }

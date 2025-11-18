@@ -92,7 +92,7 @@ body {
 }
 
 .start-button {
-  width: 100%;
+  width: 300px;
   max-width: 500px;
   padding: 12px 20px;
   font-size: 14px;
@@ -117,7 +117,6 @@ body {
 }
 
 /* Frame 2 & 3: Focused/Paused State */
-/* .focused-state,
 .paused-state {
   display: flex;
   width: 600px;
@@ -139,7 +138,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
   height: 100%;
 }
@@ -160,7 +159,7 @@ body {
   align-items: center;
   gap: 8px;
   flex: 1 0 0;
-  border-radius: 16px;
+  border-radius: 50px;
   background: #FFFFFF;
 }
 
@@ -191,7 +190,7 @@ body {
 .main-content-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 16px;
   flex: 1 0 205px;
   min-width: 0;
   width: 100%;
@@ -203,7 +202,7 @@ body {
   padding: 16px;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  /* gap: 10px; */
   align-self: stretch;
   border-radius: 16px;
   background: #FFFFFF;
@@ -220,12 +219,7 @@ body {
 .site-block {
   min-width: 0;
   height: 100%;
-}
-
-/* Subject Section (legacy - may be removed) */
-.subject-section {
-  margin-bottom: 12px;
-  flex: 0 0 auto;
+  gap: 10px;
 }
 
 .section-label {
@@ -235,7 +229,7 @@ body {
   color: #666;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  /* margin-bottom: 8px; */
 }
 
 .subject-display {
@@ -243,14 +237,6 @@ body {
   align-items: center;
   gap: 16px;
   align-self: stretch;
-}
-
-.subject-text {
-  flex: 1;
-  font-size: 13px;
-  color: #1a1a1a;
-  word-break: break-word;
-  line-height: 1.4;
 }
 
 .edit-button {
@@ -269,52 +255,6 @@ body {
 .edit-button:hover {
   background-color: rgba(181, 167, 196, 0.1);
   color: #B5A7C4;
-}
-
-/* Timer Section (legacy - may be removed) */
-.timer-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex: 0 0 auto;
-}
-
-.timer-control {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.timer-button {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #F5F3ED;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #1a1a1a;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.timer-button:hover {
-  background-color: #EBE8E0;
-  transform: scale(1.05);
-}
-
-.timer-button:active {
-  transform: scale(0.95);
-}
-
-.timer-label {
-  font-size: 11px;
-  color: #666;
-  text-transform: lowercase;
 }
 
 .focused-time {
@@ -349,6 +289,7 @@ align-self: stretch;
   flex-direction: column;
   min-width: 0;
   align-self: stretch;
+  gap: 8px;
 }
 
 
@@ -537,8 +478,8 @@ html {
   background-color: #F5F3ED;
   border-radius: 50%;
   padding: 0;
-  width: 150px;
-  height: 150px;
+  width: 200px;
+  height: 200px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -579,6 +520,95 @@ html {
   text-align: center;
   font-family: 'Monaco', 'Courier New', monospace;
   pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.countdown-text.clickable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.countdown-text.clickable:hover {
+  opacity: 0.7;
+}
+
+/* Inline Duration Picker - Integrated into countdown display */
+.duration-picker-container-inline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.duration-picker-container-inline.hidden {
+  display: none;
+}
+
+.duration-picker-wrapper-inline {
+  position: relative;
+  height: 80px;
+  width: 140px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.duration-picker-mask-inline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(245, 243, 237, 0.95) 0%,
+    rgba(245, 243, 237, 0) 25%,
+    rgba(245, 243, 237, 0) 75%,
+    rgba(245, 243, 237, 0.95) 100%
+  );
+  z-index: 2;
+}
+
+.duration-picker-inline {
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 40px 0; /* Adjusted for new option height with gap */
+}
+
+.duration-picker-inline::-webkit-scrollbar {
+  display: none;
+}
+
+.duration-picker-inline .duration-option {
+  height: 40px;
+  margin: 8px 0; /* 8px gap between options (4px top + 4px bottom) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  font-size: 42px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #A6A6A6; /* Default color, will be updated dynamically */
+  cursor: pointer;
+  transition: color 0.15s ease-out, transform 0.2s ease;
+  user-select: none;
+  font-family: 'Monaco', 'Courier New', monospace;
+  text-align: center;
+}
+
+.duration-picker-inline .duration-option:active {
+  transform: scale(0.95);
 }
 
 /* Pomodoro Cycle Indicator */
@@ -593,7 +623,7 @@ html {
 
 .tomato-emoji {
   font-size: 20px;
-  opacity: 0.5;
+  opacity: 0.3;
   transition: opacity 0.3s ease;
   user-select: none;
 }
@@ -609,7 +639,7 @@ html {
 
 @keyframes tomatoPulse {
   0%, 100% {
-    opacity: 0.5;
+    opacity: 0.3;
   }
   50% {
     opacity: 1;
@@ -646,12 +676,102 @@ html {
   color: #1a1a1a;
 }
 
+/* Duration Picker - iOS Style */
+.duration-picker-container {
+  width: 100%;
+  margin-bottom: 16px;
+  gap: 8px;
+}
+
+.duration-picker-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  text-align: center;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.duration-picker-wrapper {
+  position: relative;
+  height: 120px;
+  overflow: hidden;
+  background-color: #F5F3ED;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.duration-picker-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(245, 243, 237, 0.95) 0%,
+    rgba(245, 243, 237, 0) 20%,
+    rgba(245, 243, 237, 0) 80%,
+    rgba(245, 243, 237, 0.95) 100%
+  );
+  z-index: 2;
+}
+
+.duration-picker {
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  padding: 50px 0;
+}
+
+.duration-picker::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.duration-option {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  font-size: 18px;
+  font-weight: 500;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+  user-select: none;
+}
+
+.duration-option:active {
+  transform: scale(0.95);
+}
+
+.duration-option.selected {
+  color: #B5A7C4;
+  font-weight: 600;
+  font-size: 42px;
+}
+
+/* Timer Actions Wrapper - Contains all action button groups */
+.timer-actions-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: auto;
+  flex: 0 0 auto;
+}
+
 .action-buttons {
   display: flex;
   flex-direction: row;
   gap: 8px;
-  margin-top: auto;
-  flex: 0 0 auto;
+  width: 100%;
+  justify-content: center;
 }
 
 .action-buttons.hidden {
@@ -671,6 +791,18 @@ html {
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   text-align: center;
   letter-spacing: 0.1px;
+}
+
+/* Specific button widths */
+#pauseFocusButton,
+#startToFocusButton {
+  width: 150px;
+  
+}
+
+#resumeFocusButton,
+#stopFocusButton {
+  width: 100%;
 }
 
 .action-button-filled {
@@ -707,48 +839,4 @@ html {
   background-color: rgba(181, 167, 196, 0.12);
 }
 
-/* Legacy button styles (for compatibility) */
-.finish-button {
-  background-color: #A8E6CF;
-  color: #1a1a1a;
-}
-
-.finish-button:hover {
-  background-color: #8FD4B8;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(168, 230, 207, 0.3);
-}
-
-.break-button {
-  background-color: #FFE5B4;
-  color: #1a1a1a;
-}
-
-.break-button:hover {
-  background-color: #FFD699;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(255, 229, 180, 0.3);
-}
-
-.skip-button {
-  background-color: #FFCCCC;
-  color: #1a1a1a;
-}
-
-.skip-button:hover {
-  background-color: #FFB3B3;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(255, 204, 204, 0.3);
-}
-
-.resume-button {
-  background-color: #B5A7C4;
-  color: #FFFFFF;
-}
-
-.resume-button:hover {
-  background-color: #A898B8;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(181, 167, 196, 0.3);
-}
 

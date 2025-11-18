@@ -194,6 +194,7 @@ async function testHybridStrategy(testCase) {
     console.log();
     console.log(`📝 原因: "${result.reason}"`);
     console.log();
+    console.log('//');
 
   } catch (error) {
     console.error('❌ 错误:', error.message);
@@ -218,6 +219,7 @@ async function main() {
     console.log('='.repeat(60));
     console.log('✅ 测试完成');
     console.log('='.repeat(60));
+    console.log('//');
     
   } catch (error) {
     console.error('❌ 测试失败:', error.message);

@@ -1,7 +1,11 @@
 // Content Script for Real Focus Assistant
 // Enhanced content extraction and preprocessing
 
-const MAX_SNIPPET_LENGTH = 500;
+// Wrap in IIFE to avoid duplicate declaration errors when script is injected multiple times
+(function() {
+  'use strict';
+  
+  const MAX_SNIPPET_LENGTH = 500;
 
 /**
  * Extract key content from the page
@@ -478,6 +482,11 @@ function showTimeControlBanner(duration, message) {
   // Create M3-style banner element
   const banner = document.createElement('div');
   banner.id = 'real-focus-time-control-banner';
+  
+  // Calculate banner height to add padding to body
+  // Reduced padding: 12px top + 18px line-height + 12px bottom + 1px border = 43px, rounded to 44px
+  const bannerHeight = 44;
+  
   banner.style.cssText = `
     position: fixed;
     top: 0;
@@ -485,7 +494,7 @@ function showTimeControlBanner(duration, message) {
     right: 0;
     background: #1C1B1F; /* M3 Surface Container Highest */
     color: #E6E1E5; /* M3 On Surface */
-    padding: 16px 24px;
+    padding: 12px 24px;
     z-index: 999999;
     font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 14px;
@@ -497,22 +506,38 @@ function showTimeControlBanner(duration, message) {
     justify-content: space-between;
     animation: slideDown 0.3s cubic-bezier(0.2, 0, 0, 1);
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    max-height: 44px;
+    overflow: hidden;
   `;
+  
+  // Add padding to body to prevent content from being hidden behind banner
+  // Store original padding to restore later
+  const originalBodyPaddingTop = document.body.style.paddingTop || '';
+  const originalHtmlPaddingTop = document.documentElement.style.paddingTop || '';
+  
+  // Add padding to both html and body to ensure it works across different page layouts
+  document.documentElement.style.paddingTop = `${bannerHeight}px`;
+  document.body.style.paddingTop = `${bannerHeight}px`;
+  
+  // Store original values in banner dataset for cleanup
+  banner.dataset.originalBodyPadding = originalBodyPaddingTop;
+  banner.dataset.originalHtmlPadding = originalHtmlPaddingTop;
 
   // Create message container with M3 layout
   const messageContainer = document.createElement('div');
   messageContainer.style.cssText = `
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     flex: 1;
+    min-width: 0;
   `;
 
   // Create M3-style icon (warning icon)
   const iconContainer = document.createElement('div');
   iconContainer.innerHTML = '⚠️';
   iconContainer.style.cssText = `
-    font-size: 20px;
+    font-size: 18px;
     line-height: 1;
     flex-shrink: 0;
   `;
@@ -522,18 +547,23 @@ function showTimeControlBanner(duration, message) {
   messageTextContainer.style.cssText = `
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
   `;
 
   // Create message text
   const messageText = document.createElement('span');
-  messageText.textContent = message || '当前正在干扰平台进行搜索，你有 30 秒时间查看，之后将强制拦截';
+  messageText.textContent = message || 'You are searching on a distracting platform. You have 30 seconds to view, then the page will be blocked';
   messageText.style.cssText = `
-    font-size: 14px;
-    line-height: 20px;
+    font-size: 13px;
+    line-height: 18px;
     font-weight: 400;
     color: #E6E1E5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   `;
 
   // Create countdown display (M3 chip style)
@@ -541,16 +571,17 @@ function showTimeControlBanner(duration, message) {
   countdownDisplay.id = 'real-focus-countdown';
   countdownDisplay.style.cssText = `
     font-weight: 500;
-    font-size: 14px;
-    min-width: 48px;
+    font-size: 13px;
+    min-width: 44px;
     text-align: center;
     background: #6750A4; /* M3 Primary Container */
     color: #FFFFFF; /* M3 On Primary Container */
-    padding: 6px 12px;
-    border-radius: 16px; /* M3 chip radius */
+    padding: 4px 10px;
+    border-radius: 14px; /* M3 chip radius */
     animation: pulse 1.5s ease-in-out infinite;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.1px;
+    flex-shrink: 0;
   `;
 
   messageTextContainer.appendChild(messageText);
@@ -563,19 +594,19 @@ function showTimeControlBanner(duration, message) {
 
   // Start countdown
   let remaining = duration || 30;
-  countdownDisplay.textContent = `${remaining}秒`;
+  countdownDisplay.textContent = `${remaining}s`;
 
   const countdownInterval = setInterval(() => {
     remaining--;
     if (remaining <= 0) {
       clearInterval(countdownInterval);
-      countdownDisplay.textContent = '0秒';
+      countdownDisplay.textContent = '0s';
       // Change banner style when time is up (M3 error color)
       banner.style.background = '#1C1B1F';
       countdownDisplay.style.background = '#BA1A1A'; /* M3 Error Container */
       countdownDisplay.style.animation = 'none';
     } else {
-      countdownDisplay.textContent = `${remaining}秒`;
+      countdownDisplay.textContent = `${remaining}s`;
       // Change color as time runs out (last 5 seconds)
       if (remaining <= 5) {
         countdownDisplay.style.background = '#BA1A1A'; /* M3 Error */
@@ -597,6 +628,23 @@ function removeTimeControlBanner() {
     if (intervalId) {
       clearInterval(parseInt(intervalId));
     }
+    
+    // Restore original body and html padding
+    const originalBodyPadding = banner.dataset.originalBodyPadding;
+    const originalHtmlPadding = banner.dataset.originalHtmlPadding;
+    
+    if (originalBodyPadding === '') {
+      document.body.style.paddingTop = '';
+    } else {
+      document.body.style.paddingTop = originalBodyPadding;
+    }
+    
+    if (originalHtmlPadding === '') {
+      document.documentElement.style.paddingTop = '';
+    } else {
+      document.documentElement.style.paddingTop = originalHtmlPadding;
+    }
+    
     banner.remove();
   }
 }
@@ -666,7 +714,7 @@ function forceBlockPage(reason, score = 15) {
 
   // Create title
   const blockTitle = document.createElement('h1');
-  blockTitle.textContent = '页面已被拦截';
+  blockTitle.textContent = 'Page Blocked';
   blockTitle.style.cssText = `
     font-size: 28px;
     line-height: 36px;
@@ -692,7 +740,7 @@ function forceBlockPage(reason, score = 15) {
     letter-spacing: 0.1px;
   `;
   const scoreLabel = document.createElement('span');
-  scoreLabel.textContent = '相关性得分:';
+  scoreLabel.textContent = 'Relevance Score:';
   const scoreValue = document.createElement('span');
   scoreValue.textContent = `${score}%`;
   scoreValue.style.cssText = `
@@ -703,7 +751,7 @@ function forceBlockPage(reason, score = 15) {
 
   // Create reason text
   const blockReason = document.createElement('p');
-  blockReason.textContent = reason || '30秒宽限期已结束，已强制拦截该页面';
+  blockReason.textContent = reason || 'The 30-second grace period has ended. This page has been blocked';
   blockReason.style.cssText = `
     font-size: 16px;
     line-height: 24px;
@@ -720,9 +768,9 @@ function forceBlockPage(reason, score = 15) {
     justify-content: center;
   `;
 
-  // Create "返回上一页" button (M3 Filled Button)
+  // Create "Go Back" button (M3 Filled Button)
   const backButton = document.createElement('button');
-  backButton.textContent = '返回上一页';
+  backButton.textContent = 'Go Back';
   backButton.style.cssText = `
     background: #6750A4; /* M3 Primary */
     color: #FFFFFF; /* M3 On Primary */
@@ -805,7 +853,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'timer_start') {
     try {
       const duration = request.duration || 30;
-      const message = request.message || '当前正在干扰平台进行搜索，你有 30 秒时间查看，之后将强制拦截';
+      const message = request.message || 'You are searching on a distracting platform. You have 30 seconds to view, then the page will be blocked';
       showTimeControlBanner(duration, message);
       sendResponse({ success: true });
     } catch (error) {
@@ -818,7 +866,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle block_page message (new message name)
   if (request.action === 'block_page') {
     try {
-      const reason = request.reason || '30秒宽限期已结束，已强制拦截该页面';
+      const reason = request.reason || 'The 30-second grace period has ended. This page has been blocked';
       const score = request.score || 15; // Default 15% relevance score
       forceBlockPage(reason, score);
       sendResponse({ success: true });
@@ -829,44 +877,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  // Legacy support for old message names
-  if (request.action === 'showTimeControl') {
-    try {
-      showTimeControlBanner(request.duration || 30, request.message || '当前正在干扰平台进行搜索，你有 30 秒时间查看，之后将强制拦截');
-      sendResponse({ success: true });
-    } catch (error) {
-      console.error('Error showing time control banner:', error);
-      sendResponse({ success: false, error: error.message });
-    }
-    return true;
-  }
-
-  if (request.action === 'forceBlock') {
-    try {
-      forceBlockPage(request.reason, request.score || 15);
-      sendResponse({ success: true });
-    } catch (error) {
-      console.error('Error forcing block:', error);
-      sendResponse({ success: false, error: error.message });
-    }
-    return true;
-  }
-
-  if (request.action === 'removeTimeControl') {
-    try {
-      removeTimeControlBanner();
-      sendResponse({ success: true });
-    } catch (error) {
-      console.error('Error removing time control banner:', error);
-      sendResponse({ success: false, error: error.message });
-    }
-    return true;
-  }
-
   // Handle show_block_ui message (immediate block)
   if (request.action === 'show_block_ui') {
     try {
-      const reason = request.reason || '页面与专注主题不相关';
+      const reason = request.reason || 'This page is not relevant to your focus topic';
       const score = request.score || 15;
       forceBlockPage(reason, score);
       sendResponse({ success: true });
@@ -903,4 +917,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Log when content script is loaded
 console.log('Real Focus Assistant content script loaded');
+
+})(); // End of IIFE
 

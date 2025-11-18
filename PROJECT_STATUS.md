@@ -1,6 +1,6 @@
 # Real Focus Assistant - 项目状态总结
 
-> 最后更新: 2025-11-07
+> 最后更新: 2025-11-18
 
 ## 📋 项目概述
 
@@ -68,12 +68,26 @@
   - 优先提取前 3-5 个搜索结果的标题和摘要
   - 支持多种 Google 搜索结果选择器（.g, .rc, .tF2Cxc 等）
 - **UI 注入**: 显示时间控制倒计时和拦截界面
+- **30秒横幅优化**: 添加页面 padding，不遮挡搜索框和页面内容
+- **UI 文本**: 所有界面文本使用英文
 
-#### 2.3 Popup UI (`extension/popup.js`)
+#### 2.3 Popup UI (模块化架构)
 - **专注主题设置**: 用户输入和编辑专注主题
-- **计时器**: 显示专注时长
+  - Frame1 (输入状态): 支持输入并更新主题
+  - Frame2 (专注状态): 支持编辑 subject，实时更新
+  - 两个输入框双向同步
+- **计时器**: 显示专注时长和 Pomodoro 倒计时
+  - Focus: 25 分钟
+  - Short Break: 5 分钟
+  - Long Break: 15 分钟
 - **状态显示**: 显示当前页面的相关性分数和状态
 - **缓存清理**: 修改专注主题时自动清理缓存
+- **模块化架构**: 
+  - `popup.js` (787 行) - 主入口文件，协调各模块
+  - `ui-manager.js` (657 行) - DOM 元素引用和 UI 更新
+  - `storage-utils.js` (94 行) - Chrome Storage 操作
+  - `event-handlers.js` (417 行) - 事件处理函数
+  - `time-utils.js` (77 行) - 时间格式化工具函数
 
 ### 3. 本地测试环境
 
@@ -82,12 +96,8 @@
 - 支持 CORS，可直接被 Extension 调用
 
 #### 3.2 测试脚本
-- `test-hybrid-strategy.js`: 交互式测试混合判断策略
-- `test-threshold-update.js`: 测试阈值调整
-- `test-stock-cases.js`: 测试特定用例（炒股相关）
-- `test-xiaohongshu.js`: 测试小红书页面
-- `test-with-snippet-display.js`: 显示 Content Snippet
-- `test-google-serp.js`: 测试 Google 搜索结果页内容提取
+- `test-hybrid-strategy.js`: 交互式测试混合判断策略（主要测试工具）
+- `test-openai-key.js`: 测试 OpenAI API Key 配置
 
 ---
 
@@ -143,10 +153,11 @@
 
 ### 缓存策略
 
-- **缓存键**: URL
+- **缓存键**: `${url}|${keywords}` (URL + keywords 复合键)
 - **缓存时长**: 24 小时
 - **缓存大小限制**: 4MB
 - **自动清理**: 过期条目自动删除
+- **缓存清理**: 修改专注主题时自动清理所有缓存
 
 ---
 
@@ -155,20 +166,24 @@
 ```
 real-focus/
 ├── api/
-│   └── focus-assistant.js          # 核心 API 逻辑 (721 行)
+│   └── focus-assistant.js          # 核心 API 逻辑 (762 行)
 ├── extension/
-│   ├── background.js               # Service Worker (466 行)
-│   ├── content.js                   # Content Script (872 行)
-│   ├── popup.js                     # Popup UI (427 行)
-│   ├── popup.html                   # Popup HTML
-│   ├── popup.css                    # Popup 样式
+│   ├── background.js               # Service Worker (1,535 行)
+│   ├── content.js                   # Content Script (923 行)
+│   ├── popup.js                     # Popup 主入口 (787 行)
+│   ├── ui-manager.js                # UI 管理模块 (657 行)
+│   ├── storage-utils.js             # 存储工具模块 (92 行)
+│   ├── event-handlers.js            # 事件处理模块 (417 行)
+│   ├── time-utils.js                # 时间工具模块 (55 行)
+│   ├── popup.html                   # Popup HTML (196 行)
+│   ├── popup.css                    # Popup 样式 (843 行)
 │   └── manifest.json                # Extension 配置
 ├── local-server.js                  # 本地测试服务器
 ├── package.json                     # 项目配置
 ├── vercel.json                      # Vercel 配置
 └── [测试脚本和文档]
 
-总代码行数: ~2,483 行 (核心代码)
+总代码行数: ~6,292 行 (核心代码)
 ```
 
 ---
@@ -198,31 +213,48 @@ real-focus/
 - **FRONTEND_STATUS.md** - 前端开发进度和 UI 实现
 
 ### 测试脚本
-- `test-hybrid-strategy.js` - 交互式测试混合判断策略
-- `test-threshold-update.js` - 测试阈值调整
-- `test-stock-cases.js` - 测试特定用例（炒股相关）
-- `test-xiaohongshu.js` - 测试小红书页面
-- `test-with-snippet-display.js` - 显示 Content Snippet
-- `test-google-serp.js` - 测试 Google 搜索结果页内容提取
+- `test-hybrid-strategy.js` - 交互式测试混合判断策略（主要测试工具）
+- `test-openai-key.js` - 测试 OpenAI API Key 配置
 
 ---
 
 ## 🔄 当前开发状态
 
-### 最新修改 (2025-11-07)
+### 最新修改 (2025-01-XX)
 
 #### 已完成的功能
-1. ✅ **工具链关键词检测**: 在 Fast Block 之前检测工具链关键词，强制提升分数
-2. ✅ **内容提取优化**: 排除边栏、页脚等干扰内容，优先提取核心搜索结果
-3. ✅ **Google SERP 内容提取**: 
+1. ✅ **Popup.js 模块化重构**: 
+   - 将 1,536 行的 `popup.js` 拆分为 5 个模块
+   - `popup.js` (787 行) - 主入口文件，负责协调
+   - `ui-manager.js` (657 行) - DOM 元素引用和 UI 更新
+   - `storage-utils.js` (92 行) - Chrome Storage 操作
+   - `event-handlers.js` (417 行) - 事件处理函数
+   - `time-utils.js` (55 行) - 时间格式化工具
+   - 提高代码可维护性、可测试性和可读性
+2. ✅ **工具链关键词检测**: 在 Fast Block 之前检测工具链关键词，强制提升分数
+3. ✅ **内容提取优化**: 排除边栏、页脚等干扰内容，优先提取核心搜索结果
+4. ✅ **Google SERP 内容提取**: 
    - 检测 Google 搜索结果页
    - 跳过 H1 标签（"Accessibility Links"）
    - 提取前 3-5 个搜索结果的标题和摘要
-4. ✅ **缓存清理**: 修改专注主题时自动清理缓存
-5. ✅ **日志增强**: 添加 Content Snippet 预览到日志
-6. ✅ **文档清理**: 删除 19 个过时文档和 7 个临时测试脚本
+5. ✅ **缓存清理**: 修改专注主题时自动清理缓存（缓存键包含 URL 和 keywords）
+6. ✅ **日志增强**: 添加 Content Snippet 预览到日志
+7. ✅ **代码清理**: 
+   - 删除 5 个不再需要的测试脚本
+   - 清理 legacy 代码（content.js 中的旧消息名称支持）
+   - 清理未使用的 CSS 样式（popup.css 中的 legacy 样式）
+8. ✅ **UI 优化**:
+   - 30 秒横幅优化：添加页面 padding，不遮挡搜索框
+   - 所有 UI 文本从中文改为英文
+   - Subject 输入框同步：frame1 和 frame2 双向同步
+9. ✅ **Pomodoro 计时器**: 将测试值改回生产值（25分钟/5分钟/15分钟）
+10. ✅ **Subject 更新逻辑优化**:
+    - Frame1 输入框支持更新主题（不启动计时器）
+    - Frame2 subject 编辑支持实时更新
+    - 两个输入框保持同步
 
 #### 最近提交记录
+- 模块化重构 - 拆分 popup.js 为多个模块
 - `3666d08` - 修复 Google 搜索结果页 (SERP) 内容提取
 - `8a4e012` - 添加工具链关键词检测并清理过时文档
 - `4214d3d` - 优化 Hybrid Reasoning 阈值和 Prompt V3.3
@@ -259,10 +291,12 @@ real-focus/
 ## 📝 下一步计划
 
 1. **生产环境验证**: 验证部署后的功能是否正常工作
-2. **Google SERP 测试**: 在实际 Google 搜索结果页测试内容提取
-3. **性能优化**: 根据使用情况优化 API 调用频率
-4. **用户体验优化**: 根据用户反馈优化 UI 和交互
-5. **功能扩展**: 考虑添加更多搜索引擎支持（Bing, DuckDuckGo 等）
+2. **性能优化**: 根据使用情况优化 API 调用频率
+3. **用户体验优化**: 根据用户反馈优化 UI 和交互
+4. **功能扩展**: 
+   - 考虑添加更多搜索引擎支持（Bing, DuckDuckGo 等）
+   - 添加统计功能（每日专注时间、拦截次数等）
+   - 添加白名单功能（允许特定网站）
 
 ---
 

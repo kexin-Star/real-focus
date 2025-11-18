@@ -1,6 +1,6 @@
 # Real Focus Assistant - 前端开发进度
 
-> 最后更新: 2025-01-XX
+> 最后更新: 2025-01-XX (模块化重构完成)
 
 ## 📋 概述
 
@@ -17,7 +17,18 @@
 
 ## ✅ 已实现的 UI 组件
 
-### 1. Popup UI (`extension/popup.html`, `popup.css`, `popup.js`)
+### 1. Popup UI (模块化架构)
+
+**架构说明**: Popup UI 已重构为模块化架构，提高代码可维护性和可测试性。
+
+**模块结构**:
+- `popup.html` - HTML 结构
+- `popup.css` - 样式文件
+- `popup.js` - 主入口文件，协调各模块
+- `ui-manager.js` - UI 管理模块（DOM 元素、UI 更新）
+- `storage-utils.js` - 存储工具模块（Chrome Storage 操作）
+- `event-handlers.js` - 事件处理模块（按钮点击等）
+- `time-utils.js` - 时间工具模块（时间格式化）
 
 #### 1.1 三个状态界面
 
@@ -27,6 +38,7 @@
 - ✅ **辅助提示**: "p.s. The more details you tell, the more powerful focus assistant."
 - ✅ **开始按钮**: "Start Focus" 按钮
 - ✅ **回车键支持**: 支持 Enter 键提交
+- ✅ **主题更新**: 在 focused 状态下，frame1 输入框支持更新主题（不启动计时器）
 
 **样式特点**:
 - M3 风格输入框（圆角、阴影、焦点状态）
@@ -35,7 +47,13 @@
 
 ##### 状态 2: 专注状态 (Focused State)
 - ✅ **主题显示**: 显示当前专注主题，带编辑按钮
+  - 支持实时编辑和更新
+  - Frame1 和 Frame2 输入框双向同步
+  - 更新主题时自动清理缓存
 - ✅ **Pomodoro 计时器**: 大型倒计时显示 (MM:SS 格式)
+  - Focus: 25 分钟
+  - Short Break: 5 分钟
+  - Long Break: 15 分钟
 - ✅ **SVG 进度条**: 圆形进度条动画，显示倒计时进度
 - ✅ **Pomodoro 周期指示器**: 显示 4 个番茄钟完成状态
 - ✅ **计时器控制**: 暂停按钮和计时器显示
@@ -125,9 +143,10 @@
 
 **功能**:
 - ✅ **30秒倒计时**: 显示剩余时间
-- ✅ **警告消息**: 显示提示信息
+- ✅ **警告消息**: 显示提示信息（英文）
 - ✅ **动画效果**: 滑入动画、脉冲动画
 - ✅ **颜色变化**: 最后 5 秒变红色警告
+- ✅ **不遮挡页面**: 添加页面 padding，不遮挡搜索框和页面内容
 
 **样式特点**:
 - M3 Surface Container Highest 背景 (`#1C1B1F`)
@@ -135,10 +154,12 @@
 - 高 z-index (999999)
 - 倒计时芯片样式 (M3 Chip)
 - 警告图标 (⚠️)
+- 高度: 44px（优化后）
+- 自动添加页面 padding-top: 44px
 
 **实现细节**:
 ```javascript
-// 位置: extension/content.js:426-588
+// 位置: extension/content.js:430-611
 function showTimeControlBanner(duration, message)
 ```
 
@@ -152,7 +173,7 @@ function showTimeControlBanner(duration, message)
 **功能**:
 - ✅ **全屏覆盖**: 覆盖整个页面
 - ✅ **拦截图标**: 显示拦截图标
-- ✅ **AI 原因**: 显示 AI 的拦截理由
+- ✅ **AI 原因**: 显示 AI 的拦截理由（英文）
 - ✅ **相关性分数**: 显示低相关性分数 (默认 15%)
 - ✅ **返回按钮**: "返回上一页" 按钮
 
@@ -165,9 +186,15 @@ function showTimeControlBanner(duration, message)
 
 **实现细节**:
 ```javascript
-// 位置: extension/content.js:609-763
+// 位置: extension/content.js:644-811
 function forceBlockPage(reason, score)
 ```
+
+**UI 文本**:
+- 标题: "Page Blocked"
+- 相关性标签: "Relevance Score:"
+- 按钮: "Go Back"
+- 默认原因: "This page is not relevant to your focus topic"
 
 **动画**:
 - `fadeIn`: 遮罩淡入
@@ -222,12 +249,22 @@ function forceBlockPage(reason, score)
 ## 📊 代码统计
 
 ### 文件大小
-- `popup.html`: 173 行 (+28 行，新增 SVG 进度条结构)
-- `popup.css`: 755 行 (+409 行，新增进度条样式和动画)
-- `popup.js`: 1230 行 (+803 行，新增 Pomodoro 逻辑和进度条控制)
+- `popup.html`: 193 行 (包含 SVG 进度条结构)
+- `popup.css`: 926 行 (包含进度条样式和动画)
+- `popup.js`: 587 行 (主入口文件，协调各模块)
+- `ui-manager.js`: 593 行 (DOM 元素引用和 UI 更新)
+- `storage-utils.js`: 92 行 (Chrome Storage 操作)
+- `event-handlers.js`: 250 行 (事件处理函数)
+- `time-utils.js`: 55 行 (时间格式化工具)
 - `content.js`: 872 行 (包含 UI 和内容提取)
-- `background.js`: 1460 行 (Service Worker，包含 Pomodoro 状态管理)
-- **总计**: ~4,490 行前端代码
+- `background.js`: 1,472 行 (Service Worker，包含 Pomodoro 状态管理)
+- **总计**: ~5,042 行前端代码
+
+### 模块化架构优势
+- ✅ **可维护性**: 每个模块职责单一，易于定位和修改
+- ✅ **可测试性**: 模块可独立测试
+- ✅ **可读性**: 文件更小，逻辑更清晰
+- ✅ **可扩展性**: 新功能可添加到对应模块
 
 ### UI 组件数量
 - Popup 状态: 3 个 (Input, Focused, Paused)
@@ -284,8 +321,9 @@ function forceBlockPage(reason, score)
 
 ### 缓存状态
 - 24 小时缓存
+- 缓存键: `${url}|${keywords}` (URL + keywords 复合键)
 - 自动清理过期缓存
-- 主题变更时清理缓存
+- 主题变更时清理所有缓存
 
 ---
 
@@ -357,17 +395,21 @@ function forceBlockPage(reason, score)
 
 ### 关键设计决策
 
-1. **固定尺寸设计**: Popup 使用固定 600x440px，避免响应式复杂性
-2. **状态同步**: 专注状态和暂停状态数据自动同步，避免不一致
-3. **缓存机制**: 使用 Service Worker 缓存 API 结果，减少调用
-4. **M3 设计系统**: 严格遵循 Material Design 3 规范
-5. **向后兼容**: 支持旧版消息名称，确保平滑升级
-6. **SVG 进度条设计**:
+1. **模块化架构**: 
+   - 将大型单文件拆分为多个职责单一的模块
+   - 通过依赖注入实现模块间通信
+   - 提高代码可维护性和可测试性
+2. **固定尺寸设计**: Popup 使用固定 600x440px，避免响应式复杂性
+3. **状态同步**: 专注状态和暂停状态数据自动同步，避免不一致
+4. **缓存机制**: 使用 Service Worker 缓存 API 结果，减少调用
+5. **M3 设计系统**: 严格遵循 Material Design 3 规范
+6. **向后兼容**: 支持旧版消息名称，确保平滑升级
+7. **SVG 进度条设计**:
    - 使用 `stroke-dasharray` 和 `stroke-dashoffset` 实现圆形进度条
    - 进度条显示在背景圆外侧，形成双层圆形视觉效果
    - 根据 Pomodoro 状态（Focus/Break）动态切换颜色
    - 透明度从 20% 到 100% 随进度渐变，增强视觉反馈
-7. **动画性能优化**:
+8. **动画性能优化**:
    - 更新频率从 1 秒改为 50ms（20fps），确保动画流畅
    - 使用 CSS `transition` 配合高频更新，实现丝滑动画
    - 确保最后一秒时能完整画完圆
@@ -380,9 +422,20 @@ function forceBlockPage(reason, score)
 4. **浏览器兼容**: 仅支持 Chrome/Edge (Manifest V3)
 5. **Pomodoro 计时器**: 使用测试时长（10秒/5秒），生产环境需要调整为标准时长（25分钟/5分钟/15分钟）
 
-### 最新更新 (2025-11-08)
+### 最新更新 (2025-01-XX)
 
-#### SVG 倒计时进度条实现
+#### 模块化重构 (2025-01-XX)
+- ✅ **Popup.js 模块化重构**: 将 1,536 行的单文件拆分为 5 个模块
+  - `popup.js` (587 行) - 主入口文件，负责状态管理和协调
+  - `ui-manager.js` (593 行) - DOM 元素引用、UI 更新、状态切换
+  - `storage-utils.js` (92 行) - Chrome Storage 读写操作
+  - `event-handlers.js` (250 行) - 所有按钮点击事件处理
+  - `time-utils.js` (55 行) - 时间格式化工具函数
+- ✅ **代码组织优化**: 每个模块职责单一，提高可维护性
+- ✅ **依赖注入**: 事件处理函数通过依赖注入访问其他模块功能
+- ✅ **全局作用域共享**: 浏览器扩展环境，模块通过全局作用域共享
+
+#### SVG 倒计时进度条实现 (2025-11-08)
 - ✅ 实现了基于 SVG `stroke-dasharray` 和 `stroke-dashoffset` 的圆形进度条
 - ✅ 进度条显示在背景圆外侧，形成双层圆形设计
 - ✅ 根据 Pomodoro 状态动态切换颜色：
